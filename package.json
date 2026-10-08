@@ -1,0 +1,55 @@
+{
+  "name": "lint-agent",
+  "version": "0.1.0",
+  "description": "跨端规则自治维护 Agent：从自然语言文档提取跨端约束数据，由单一 ESLint 规则引擎在 CI 拦截违规写法",
+  "license": "MIT",
+  "keywords": [
+    "eslint",
+    "lint",
+    "agent",
+    "llm",
+    "cross-platform",
+    "dsl",
+    "codegen"
+  ],
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "lint-agent": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/cli/index.ts",
+    "generate": "tsx src/cli/index.ts generate --from examples/input/cross-platform-pitfalls.md",
+    "generate:state": "tsx src/cli/index.ts generate --from examples/input/cross-platform-pitfalls.md --planner state",
+    "eval": "tsx src/cli/index.ts eval --from examples/input/cross-platform-pitfalls.md --expect examples/expected/expected-rules.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "verify:lint": "tsx verify/verify.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "chalk": "^5.4.1",
+    "commander": "^13.1.0",
+    "eslint": "^9.39.5",
+    "openai": "^4.82.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.9",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^3.0.5"
+  }
+}
