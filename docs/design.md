@@ -120,25 +120,25 @@ interface EngineConfig {
 
 「规则命中但解析失败」不再静默跳过，而是按 `onResolveFail` 显式降级，杜绝漏报。
 
-## 7. 与现有实现的差距
-
-| 现状（已实现）                                                 | 目标                                                            | 改动                                                    |
-| -------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------- |
-| `isViolation(conditions, matrix)` 用 `matrix.target[p]` 比版本 | 按调用点传 `(actualVersion, platform, order)`                   | 改 `isViolation` 签名与实现                             |
-| `SupportMatrix { target, order }`                              | `EngineConfig { sdkName, platformFlags, order }`                | 类型 + schema + 落地读取                                |
-| `createUnsupportedApiRule` 只按 selector 分组 report           | visitor 内做版本/平台解析，按 level/onResolveFail 决定 severity | 引入 `context.sourceCode` scope/祖先遍历                |
-| `Constraint` 无 level                                          | 增加 `level` / `onResolveFail` 字段                             | schema + 提取 prompt                                    |
-| —                                                              | `[跳过]` 条目识别为「不产出约束」                               | extract-patterns prompt 增加「不可静态检测 → 跳过」指令 |
-
-## 8. 落地顺序
-
-1. 类型与 schema：`Constraint` 加 `level`/`onResolveFail`，`EngineConfig` 取代 `SupportMatrix`，`isViolation` 改签名。
-2. 版本解析器 + 平台解析器（纯函数层，先脱离 ESLint 可单测）。
-3. `createUnsupportedApiRule` 接入 scope / 祖先解析与 severity 决策。
-4. `extract-patterns` prompt 增加 `selector`（根标识 jue）+ `level`/`onResolveFail` + 「跳过不可静态检测」指令。
-5. 样例数据 [cross-platform-pitfalls.md](../examples/input/cross-platform-pitfalls.md) 已按 jue 重写，作为生成与评估基线。
-
-## 9. 已确认的结论
+## 7. 已确认的结论
 
 - **版本空间**：单一公共版本空间，`order` 用单清单。但 jue 支持应用内多版本共存（嵌套页面），故必须按调用点从 import 解析版本（§4），不能用全局 `target`。
 - **平台守卫**：需同时支持 `environment`（字符串，枚举为四端）与布尔 flag 两类，且需推断 `else` / 取反的「非此端」补集（§5）。
+
+## 8. 语义评审（LLM-as-judge）与 evidence 字段
+
+**问题**：行为校验用同一份 `conditions` 既合成用例又生成期望，只能证明「引擎接线正确」，证明不了「约束语义正确」——minVersion 抄错（文档 2.10.0 提成 2.12.0）、platform 写偏、level 标错都能全绿通过。覆盖率校验只比对 API 路径字符串，同样发现不了。这是「数据自洽但与文档不符」的缺口，也是行为校验方案残留的循环论证。
+
+**决策**：
+
+1. `Constraint` 增加 `evidence` 字段——LLM 提取时逐字摘录文档中支撑该约束的原句（禁止改写/拼接），作为约束的审计锚点与评审靶子。
+2. 新增语义评审器 `verifySemantics`（agent/judge.ts）：LLM-as-judge 按批（20 条/批）对照文档原文评审每条约束的 conditions / level / evidence / target 忠实度，verdict 经 Zod 校验；评审遗漏的条目不判失败（避免评审抖动引发空转修正），评审调用失败跳过本批（增强信号不阻塞主链路）。
+3. 语义失败进入自纠错闭环的第三类修正策略：`heal_semantics` 带评审意见 + 文档原文回喂 LLM 修正。
+4. `eval` 命令以 `--semantic` opt-in 暴露该能力（默认关闭，保持 eval 的零 LLM 快速基线）。
+
+**三道校验的正交性**：覆盖率抓「漏提 / 幻觉」（集合差），行为抓「规则不生效」（引擎接线），语义抓「与文档不符」（数据忠实度）——三类缺口互不覆盖。
+
+## 9. 自纠错闭环为什么是确定性策略而非 ReAct
+
+- 决策空间离散且可枚举：幻觉→删除（零 LLM）、漏提→补提取、语义不符→对照文档修正、行为失败→带上下文修正。四类策略用代码编码，LLM 只在需要语言理解的环节出场（提取 / 修正 / 评审）。
+- 可复现与可审计优先：感知层（覆盖率正则 / ESLint Linter）是确定性程序，trace 落盘每轮观测；ReAct 的自由规划在这里只引入抖动与成本，不带来泛化收益。

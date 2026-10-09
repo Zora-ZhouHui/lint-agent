@@ -10,6 +10,7 @@ import type { ChatCompletionCreateParamsNonStreaming } from 'openai/resources/ch
 import Anthropic from '@anthropic-ai/sdk';
 import chalk from 'chalk';
 import { type ZodType, type ZodTypeDef } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import type { ChatOptions, LLMConfig, LLMUsage, Message } from '../types/index.js';
 import { ensureDir } from '../utils/file.js';
 
@@ -34,7 +35,7 @@ export function loadLLMConfigFromEnv(): LLMConfig {
     model: process.env.LLM_MODEL ?? (provider === 'anthropic' ? 'claude-sonnet-4-5' : 'gpt-4o'),
     apiKey,
     baseURL: process.env.LLM_BASE_URL || undefined,
-    maxRetries: 3, // 关键要求 5：LLM 调用失败重试 3 次
+    maxRetries: 3, // LLM 调用失败重试 3 次
     timeoutMs: 180000,
     // 关闭思考模式（仅对支持该参数的兼容网关生效，如智谱 GLM-4.5+）
     disableThinking: process.env.LLM_DISABLE_THINKING === '1',
@@ -87,7 +88,7 @@ export function extractJSON(text: string): unknown {
 export class LLMClient {
   private openai?: OpenAI;
   private anthropic?: Anthropic;
-  // 每次调用的用量记录，供上层（Agent 循环）读取并写入 trace
+  // 每次调用的用量记录，供上层（提取流水线）读取并写入 trace
   private usages: LLMUsage[] = [];
   // 节流：上一次请求发出的时间戳（0 = 还没发过）
   private lastRequestAt = 0;
@@ -116,12 +117,12 @@ export class LLMClient {
 
   /**
    * 结构化对话：提取 JSON → Zod 校验。
-   * 校验失败时把错误回传给 LLM 要求修正（格式修复循环），
-   * 总尝试次数 = maxRetries + 1。
+   * - structuredOutput: true 时优先使用原生结构化输出（OpenAI json_schema / Anthropic tool use），
+   *   API 不支持时自动回退到 json_object 模式。
+   * - 校验失败时把错误回传给 LLM 要求修正（格式修复循环），总尝试次数 = maxRetries + 1。
    */
   async chatJSON<T>(
     messages: Message[],
-    // 输入类型不限定（schema 可带 .default() 等），输出类型为 T
     schema: ZodType<T, ZodTypeDef, unknown>,
     options: ChatOptions = {},
   ): Promise<T> {
@@ -129,10 +130,52 @@ export class LLMClient {
     const maxAttempts = this.config.maxRetries + 1;
     let lastError: unknown;
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const text = await this.chat(convo, { ...options, jsonMode: true });
+    // 准备结构化输出：Zod → JSON Schema，包裹在 { data: ... } 对象中
+    // （OpenAI json_schema 和 Anthropic tool use 均要求顶层为 object）
+    let jsonSchema: object | undefined;
+    const schemaName = options.label ?? 'output';
+    if (options.structuredOutput) {
       try {
-        return schema.parse(extractJSON(text));
+        const rawSchema = zodToJsonSchema(schema) as Record<string, unknown>;
+        delete rawSchema.$schema;
+        jsonSchema = {
+          type: 'object',
+          properties: { data: rawSchema },
+          required: ['data'],
+          additionalProperties: false,
+        };
+      } catch {
+        // schema 转换失败 → 静默回退到 json_object 模式
+      }
+    }
+    let structuredFailed = false;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const useStructured = jsonSchema !== undefined && !structuredFailed;
+      let text: string;
+      try {
+        text = await this.chat(convo, {
+          ...options,
+          jsonMode: true,
+          jsonSchema: useStructured ? jsonSchema : undefined,
+          schemaName: useStructured ? schemaName : undefined,
+        });
+      } catch (err) {
+        // 结构化输出不被 API 支持 → 回退到 json_object，不消耗本次 attempt
+        if (useStructured && this.isStructuredNotSupported(err)) {
+          structuredFailed = true;
+          continue;
+        }
+        throw err;
+      }
+
+      try {
+        let parsed = extractJSON(text);
+        // 结构化输出的响应包裹在 { data: ... } 里，需要解包
+        if (useStructured && parsed !== null && typeof parsed === 'object' && 'data' in parsed) {
+          parsed = (parsed as { data: unknown }).data;
+        }
+        return schema.parse(parsed);
       } catch (err) {
         lastError = err;
         const reason = errMessage(err).slice(0, 500);
@@ -149,11 +192,6 @@ export class LLMClient {
       `chatJSON 在 ${maxAttempts} 次尝试后仍未得到合法输出（label=${options.label ?? 'chat'}）：` +
         errMessage(lastError),
     );
-  }
-
-  /** 最近一次调用的用量（供 trace 记录 tokensUsed） */
-  getLastUsage(): LLMUsage | undefined {
-    return this.usages.at(-1);
   }
 
   /** 累计 token 消耗（供 eval 统计） */
@@ -177,13 +215,26 @@ export class LLMClient {
     let completionTokens = 0;
 
     if (this.openai) {
+      // 优先使用 json_schema 结构化输出，回退到 json_object
+      const responseFormat = options.jsonSchema
+        ? {
+            type: 'json_schema' as const,
+            json_schema: {
+              name: options.schemaName ?? 'output',
+              schema: options.jsonSchema,
+              strict: false,
+            },
+          }
+        : options.jsonMode
+          ? { type: 'json_object' as const }
+          : undefined;
       // thinking 是非标准参数（智谱等兼容网关支持），混入 body 后整体断言
       const params = {
         model: this.config.model,
         messages,
         temperature: options.temperature,
         max_tokens: options.maxTokens,
-        response_format: options.jsonMode ? { type: 'json_object' } : undefined,
+        response_format: responseFormat,
         ...(this.config.disableThinking ? { thinking: { type: 'disabled' } } : {}),
       } as unknown as ChatCompletionCreateParamsNonStreaming;
       const res = await this.openai.chat.completions.create(params, {
@@ -202,21 +253,50 @@ export class LLMClient {
         .filter((m) => m.role !== 'system')
         .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-      const res = await this.anthropic.messages.create(
-        {
-          model: this.config.model,
-          max_tokens: options.maxTokens ?? 4096,
-          system: system || undefined,
-          messages: rest,
-          temperature: options.temperature,
-        },
-        { timeout: this.config.timeoutMs },
-      );
-      for (const block of res.content) {
-        if (block.type === 'text') response += block.text;
+      if (options.jsonSchema) {
+        // Anthropic: 用 tool use 实现结构化输出
+        const tool = {
+          name: options.schemaName ?? 'output',
+          description: '输出结构化数据',
+          input_schema: options.jsonSchema as { type: 'object' } & Record<string, unknown>,
+        };
+        const res = await this.anthropic.messages.create(
+          {
+            model: this.config.model,
+            max_tokens: options.maxTokens ?? 4096,
+            system: system || undefined,
+            messages: rest,
+            temperature: options.temperature,
+            tools: [tool],
+            tool_choice: { type: 'tool', name: tool.name },
+          },
+          { timeout: this.config.timeoutMs },
+        );
+        for (const block of res.content) {
+          if (block.type === 'tool_use') {
+            response = JSON.stringify(block.input);
+            break;
+          }
+        }
+        promptTokens = res.usage.input_tokens;
+        completionTokens = res.usage.output_tokens;
+      } else {
+        const res = await this.anthropic.messages.create(
+          {
+            model: this.config.model,
+            max_tokens: options.maxTokens ?? 4096,
+            system: system || undefined,
+            messages: rest,
+            temperature: options.temperature,
+          },
+          { timeout: this.config.timeoutMs },
+        );
+        for (const block of res.content) {
+          if (block.type === 'text') response += block.text;
+        }
+        promptTokens = res.usage.input_tokens;
+        completionTokens = res.usage.output_tokens;
       }
-      promptTokens = res.usage.input_tokens;
-      completionTokens = res.usage.output_tokens;
     }
 
     const durationMs = Date.now() - started;
@@ -279,6 +359,21 @@ export class LLMClient {
     }
     if (e?.name && ['APIConnectionError', 'APIConnectionTimeoutError'].includes(e.name)) {
       return true;
+    }
+    return false;
+  }
+
+  /** 检测 API 是否不支持 json_schema 结构化输出（用于自动回退到 json_object） */
+  private isStructuredNotSupported(err: unknown): boolean {
+    const e = err as { status?: number; message?: string };
+    if (e?.status === 400 || e?.status === 422) {
+      const msg = e?.message ?? '';
+      return (
+        msg.includes('json_schema') ||
+        msg.includes('response_format') ||
+        msg.includes('responseFormat') ||
+        msg.toLowerCase().includes('unsupported')
+      );
     }
     return false;
   }

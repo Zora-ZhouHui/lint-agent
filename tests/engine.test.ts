@@ -146,11 +146,13 @@ if (isIOS) {
       [
         {
           name: 'no-foo',
+          target: 'foo',
           selector: 'CallExpression[callee.name="foo"]',
           message: 'x',
           conditions: [],
           level: 'error',
           onResolveFail: 'warn',
+          evidence: '',
         },
       ],
       null,

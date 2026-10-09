@@ -3,13 +3,15 @@
 import type { Constraint, EngineConfig } from '../types/index.js';
 import { constraintArraySchema, engineConfigSchema } from '../types/index.js';
 import { readJSON, writeJSON } from '../utils/file.js';
+import { fillSelectors } from './selector.js';
 
 export function writeConstraints(filePath: string, constraints: Constraint[]): void {
   writeJSON(filePath, constraints);
 }
 
-export function loadConstraints(filePath: string): Constraint[] {
-  return constraintArraySchema.parse(readJSON<unknown>(filePath));
+export function loadConstraints(filePath: string, sdkName = 'jue'): Constraint[] {
+  const raw = constraintArraySchema.parse(readJSON<unknown>(filePath));
+  return fillSelectors(raw as Constraint[], sdkName);
 }
 
 export function loadEngineConfig(filePath: string): EngineConfig {

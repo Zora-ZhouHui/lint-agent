@@ -40,12 +40,45 @@ export type ResolveFail = 'warn' | 'skip';
  * - 语义数据行 → 未来 L3
  */
 export interface Constraint {
-  name: string; // 标识，kebab-case（消息 / 未来按名禁用）
+  name: string; // 人读标识，kebab-case（展示 / 消息）
+  target: string; // 确定性身份标识：SDK 挂载 API 路径，如 jue.system.getSystemInfo（去重与评估匹配键）
   selector: string; // esquery AST selector，精确匹配违规节点
   message: string; // 违规时报告给开发者的提示语
   conditions: Condition[];
   level: Level; // 硬校验（error）/ 天生提醒（warn）
   onResolveFail: ResolveFail; // 解析失败时的降级（error 级别时生效）
+  /** 文档原文字句引用（支撑该约束的出处），供人工审计与 LLM-as-judge 语义校验锚定 */
+  evidence: string;
+}
+
+/** 语义校验（LLM-as-judge）失败项：约束与文档原文不符的具体问题。 */
+export interface SemanticFailure {
+  name: string;
+  target: string;
+  issue: string;
+}
+
+/** 同 target 冲突：同一 API 存在多个不一致的数据行（跨章节矛盾，需人工裁决）。 */
+export interface ConstraintConflict {
+  target: string;
+  variants: Constraint[];
+}
+
+/** 行为校验失败详情：带合成用例代码与 lint 实际输出，供 heal prompt 回喂完整失败上下文。 */
+export interface BehaviorFailureDetail {
+  name: string;
+  target: string;
+  reason: string;
+  /** 失败约束的原始条件 / 级别 / 降级策略（回喂给 heal prompt） */
+  conditions: Condition[];
+  level: Level;
+  onResolveFail: ResolveFail;
+  /** 合成出的必命中用例代码（fire 校验失败时给 LLM 看） */
+  fire?: string;
+  /** 合成出的必放行用例代码（not-fire 误报时给 LLM 看） */
+  notFire?: string;
+  /** lint 对用例的实际报告消息 */
+  messages?: string[];
 }
 
 /**
@@ -66,54 +99,47 @@ export interface EngineConfig {
   order: string[];
 }
 
-// ---------- Agent 循环 ----------
+// ---------- 提取流水线 ----------
 
-// Agent 循环的上下文
-export interface AgentContext {
-  inputDoc: string;
-  constraints: Constraint[];
-  currentStep: number;
-  maxSteps: number;
-  history: AgentStep[];
-  failures: string[];
-}
-
-// Agent 每一步的记录
+// 提取阶段单步的可观测记录（落盘 trace 供审计）
 export interface AgentStep {
   step: number;
-  thought: string;
-  action: string;
-  actionInput: Record<string, unknown>;
   observation: string;
   timestamp: number;
   durationMs: number;
   tokensUsed?: number;
 }
 
-// Planner 的输出
-export type PlannerAction = 'extract_patterns' | 'finish';
+// ---------- 自纠错循环（generate → eval → self-heal） ----------
 
-export interface PlannerDecision {
-  thought: string;
-  action: PlannerAction;
-  actionInput: Record<string, unknown>;
+/** 单轮自纠错的执行记录。 */
+export interface HealRound {
+  round: number;
+  observation: string;
+  constraintCount: number; // 该轮结束时约束总数
+  coverageMissed: string[];
+  coverageHallucinated: string[];
+  behaviorFailures: { name: string; reason: string }[];
+  semanticFailures: SemanticFailure[]; // 语义校验失败（约束与文档原文不符）
+  healedCount: number;
+  durationMs: number;
+  tokensUsed: number;
+  /** 该轮 LLM 修正调用失败记录（不中断循环，但落盘可观测，杜绝静默吞异常） */
+  llmFailures: { strategy: string; error: string }[];
 }
 
-/**
- * Planner 决策模式：
- * - `state`：确定性状态机，从不调用 LLM（完全可复现，适合 CI 与大批量跑）
- * - `auto` ：确定性状态机（默认）
- * - `llm`  ：每一步都问 LLM（供对比实验，token 消耗最高）
- */
-export type PlannerMode = 'state' | 'auto' | 'llm';
-
-export const PLANNER_MODES: readonly PlannerMode[] = ['state', 'auto', 'llm'];
-
-// Reflector 的输出
-export interface ReflectionResult {
-  done: boolean;
-  reason: string;
-  shouldContinue: boolean;
+/** 自纠错循环的最终结果。 */
+export interface SelfHealResult {
+  constraints: Constraint[];
+  /** 初始提取时检测到的同 target 数据行冲突（保留首次出现，显式上报）。 */
+  conflicts: ConstraintConflict[];
+  rounds: HealRound[];
+  passed: boolean;
+  finalMissed: string[];
+  finalHallucinated: string[];
+  finalBehaviorFailures: { name: string; reason: string }[];
+  finalSemanticFailures: SemanticFailure[];
+  durationMs: number;
 }
 
 // ---------- LLM ----------
@@ -145,7 +171,11 @@ export interface ChatOptions {
   temperature?: number;
   maxTokens?: number;
   jsonMode?: boolean; // 请求 JSON 输出（json mode / tool use）
-  label?: string; // 日志标识，如 'planner'、'extract_patterns'
+  label?: string; // 日志标识，如 'extract_patterns'
+  structuredOutput?: boolean; // 使用原生结构化输出（OpenAI json_schema / Anthropic tool use），不支持时自动回退
+  // 内部字段：由 chatJSON 设置，外部调用方不需要
+  jsonSchema?: object; // 结构化输出的 JSON Schema（doChat 用）
+  schemaName?: string; // json_schema 的 name 或 Anthropic tool name
 }
 
 // 单次调用的 token/耗时统计
@@ -154,41 +184,6 @@ export interface LLMUsage {
   completionTokens: number;
   totalTokens: number;
   durationMs: number;
-}
-
-// ---------- 评估 ----------
-
-// 评估结果
-export interface EvalResult {
-  totalConstraints: number;
-  matchedExpected: number;
-  accuracy: number;
-  falsePositives: number;
-  falsePositiveRate: number;
-  falseNegatives: number;
-  falseNegativeRate: number;
-  avgDurationMs: number;
-  totalTokens: number;
-}
-
-// 期望的规则（expected-rules.json 里的单条）
-export interface ExpectedRule {
-  name: string;
-  target: string;
-  platforms: Platform[];
-}
-
-// 期望的测试用例
-export interface ExpectedTestCase {
-  code: string;
-  shouldReport: boolean;
-  ruleName: string;
-}
-
-// expected-rules.json 的整体结构
-export interface ExpectedFile {
-  expectedRules: ExpectedRule[];
-  testCases: ExpectedTestCase[];
 }
 
 // ---------- Zod 运行时校验 ----------
@@ -210,14 +205,27 @@ export const conditionSchema = z.discriminatedUnion('kind', [
 
 export const constraintSchema = z.object({
   name: z.string().regex(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/, '约束名必须是 kebab-case'),
-  selector: z.string().min(1),
+  target: z.string().min(1),
+  // selector 不再由 LLM 产出，由 targetToSelector 机械推导；保留可选以兼容历史数据
+  selector: z.string().optional(),
   message: z.string().min(1),
   conditions: z.array(conditionSchema).default([]),
   level: z.enum(['error', 'warn']).default('error'),
   onResolveFail: z.enum(['warn', 'skip']).default('warn'),
+  // 文档原文字句引用；default('') 兼容缺 evidence 的历史数据（如固定快照）
+  evidence: z.string().default(''),
 });
 
 export const constraintArraySchema = z.array(constraintSchema);
+
+/** LLM-as-judge 语义评审的单条判定结果。 */
+export const semanticVerdictSchema = z.object({
+  name: z.string().min(1),
+  ok: z.boolean(),
+  issue: z.string().default(''),
+});
+
+export const semanticVerdictArraySchema = z.array(semanticVerdictSchema);
 
 export const engineConfigSchema = z.object({
   sdkName: z.string().min(1),
@@ -227,36 +235,4 @@ export const engineConfigSchema = z.object({
     envValues: z.record(platformSchema),
   }),
   order: z.array(z.string()),
-});
-
-export const plannerDecisionSchema = z.object({
-  thought: z.string(),
-  action: z.enum(['extract_patterns', 'finish']),
-  // LLM 偶尔会省略 actionInput，给个默认值兜底
-  actionInput: z.record(z.unknown()).default({}),
-});
-
-export const reflectionResultSchema = z.object({
-  done: z.boolean(),
-  reason: z.string(),
-  // prompt 里只要求输出 done/reason，shouldContinue 由 Reflector 代码补齐
-  shouldContinue: z.boolean().optional(),
-});
-
-// expected-rules.json 的整体结构校验
-export const expectedFileSchema = z.object({
-  expectedRules: z.array(
-    z.object({
-      name: z.string(),
-      target: z.string(),
-      platforms: z.array(platformSchema),
-    }),
-  ),
-  testCases: z.array(
-    z.object({
-      code: z.string(),
-      shouldReport: z.boolean(),
-      ruleName: z.string(),
-    }),
-  ),
 });

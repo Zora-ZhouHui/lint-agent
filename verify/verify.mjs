@@ -1,7 +1,10 @@
-// 端到端校验：把 Agent 提取的约束（output/constraints.json）接进单引擎 ESLint 规则，
-// 对 verify/app 里的 jue SDK 真实示例代码跑一次 lint，验证约束数据真能抓到跨端违规写法。
+// 端到端校验：把固定基线的约束数据（examples/expected/constraints.json，已提交）接进单引擎
+// ESLint 规则，对 verify/app 里的 jue SDK 真实示例代码跑一次 lint，验证约束数据真能抓到违规写法。
 //
-// 用法：先跑 npm run generate 生成约束数据，再跑 npm run verify:lint。
+// 约束数据是「文档 → 约束」提取阶段的固定快照，运行时无需 LLM、无需 generate：
+//   - 默认读 examples/expected/constraints.json（随仓库提交）
+//   - 用环境变量 CONSTRAINTS_FILE 可指向其它文件（如 output/constraints.json）
+// 修改踩坑文档后更新快照：npm run generate && npm run constraints:snapshot
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,7 +14,9 @@ import { buildUnsupportedApiConfig } from '../src/engine/unsupported-api.js';
 import { defaultEngineConfig } from '../src/engine/default-config.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const CONSTRAINTS_FILE = path.join(ROOT, 'output', 'constraints.json');
+const CONSTRAINTS_FILE = process.env.CONSTRAINTS_FILE
+  ? path.resolve(ROOT, process.env.CONSTRAINTS_FILE)
+  : path.join(ROOT, 'examples', 'expected', 'constraints.json');
 const APP_DIR = path.join(ROOT, 'verify', 'app');
 
 // 每个示例文件对应的违规点描述（用于覆盖率核对）
@@ -33,7 +38,10 @@ function walkJs(dir) {
 
 function main() {
   if (!fs.existsSync(CONSTRAINTS_FILE)) {
-    console.error('\n✖ 没找到约束数据文件（output/constraints.json）。请先运行 npm run generate。');
+    console.error(
+      `\n✖ 没找到约束数据文件（${CONSTRAINTS_FILE}）。请先运行 npm run generate 生成约束，` +
+        '再运行 npm run constraints:snapshot 提交固定基线。',
+    );
     process.exit(1);
   }
 

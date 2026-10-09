@@ -1,0 +1,1908 @@
+[
+  {
+    "name": "no-system-getsysteminfo",
+    "target": "jue.system.getSystemInfo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"getSystemInfo\"]",
+    "message": "jue.system.getSystemInfo 在 iOS 需 jue ≥ 2.25.0，Android 需 jue ≥ 2.10.0，低于阈值请改用静态字段兜底。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.25.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.10.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.25.0，Android 需 jue ≥ 2.10.0。低于阈值改用静态字段兜底。"
+  },
+  {
+    "name": "no-system-getplatform",
+    "target": "jue.system.getPlatform",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"getPlatform\"]",
+    "message": "jue.system.getPlatform 所有端需 jue ≥ 2.0.0，更早版本请使用注入的 isIOS / isAndroid 标志判断。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。更早版本须用注入的 isIOS / isAndroid 标志判断。"
+  },
+  {
+    "name": "no-system-getappversion",
+    "target": "jue.system.getAppVersion",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"getAppVersion\"]",
+    "message": "jue.system.getAppVersion 在 iOS 需 jue ≥ 2.30.0，Android 需 jue ≥ 2.15.0，低于阈值请从打包配置读取。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.30.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.15.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.30.0，Android 需 jue ≥ 2.15.0。低于阈值从打包配置读取。"
+  },
+  {
+    "name": "no-system-getsdkversion",
+    "target": "jue.system.getSDKVersion",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"getSDKVersion\"]",
+    "message": "jue.system.getSDKVersion 所有端需 jue ≥ 2.20.0，请用于特性探测替代。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.20.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.20.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.20.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.20.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.20.0 才支持。用于特性探测替代。"
+  },
+  {
+    "name": "no-system-getbatteryinfo",
+    "target": "jue.system.getBatteryInfo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"getBatteryInfo\"]",
+    "message": "jue.system.getBatteryInfo 鸿蒙 ArkTS 不支持，请改用自定义原生桥接或仅提示。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkTS 不支持。改用自定义原生桥接，或仅提示。"
+  },
+  {
+    "name": "no-system-getbatteryinfosync",
+    "target": "jue.system.getBatteryInfoSync",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"getBatteryInfoSync\"]",
+    "message": "jue.system.getBatteryInfoSync 在 iOS 需 jue ≥ 2.40.0，Android 需 jue ≥ 2.35.0，低于阈值请走异步版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.40.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.35.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.40.0，Android 需 jue ≥ 2.35.0。低于阈值走异步版本。"
+  },
+  {
+    "name": "no-system-vibrate",
+    "target": "jue.system.vibrate",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"vibrate\"]",
+    "message": "jue.system.vibrate 鸿蒙部分机型不支持，请做能力探测后降级为忽略。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙部分机型不支持。做能力探测后降级为忽略。"
+  },
+  {
+    "name": "no-system-getnetworktype",
+    "target": "jue.system.getNetworkType",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"getNetworkType\"]",
+    "message": "jue.system.getNetworkType 所有端需 jue ≥ 2.5.0，更早版本请改用 jue.network.getNetworkType。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.5.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.5.0 才支持。更早版本改用 jue.network.getNetworkType。"
+  },
+  {
+    "name": "no-system-scancode",
+    "target": "jue.system.scanCode",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"scanCode\"]",
+    "message": "jue.system.scanCode 在 iOS 需 jue ≥ 2.45.0，Android 需 jue ≥ 2.32.0，低于阈值请禁用入口或提示升级。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.45.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.32.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.45.0，Android 需 jue ≥ 2.32.0。低于阈值禁用入口或提示升级。"
+  },
+  {
+    "name": "no-system-getclipboard",
+    "target": "jue.system.getClipboard",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"getClipboard\"]",
+    "message": "jue.system.getClipboard 旧接口已废弃，平台差异不确定，请迁移到 jue.clipboard.getClipboardData。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "旧接口已废弃，平台差异不确定，仅提示迁移到 jue.clipboard.getClipboardData。"
+  },
+  {
+    "name": "no-system-getmemoryinfo",
+    "target": "jue.system.getMemoryInfo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"getMemoryInfo\"]",
+    "message": "jue.system.getMemoryInfo 平台返回字段不一致，请按端分支处理。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "平台返回字段不一致，仅提示按端分支处理。"
+  },
+  {
+    "name": "no-system-onmemorywarning",
+    "target": "jue.system.onMemoryWarning",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"system\"][callee.property.name=\"onMemoryWarning\"]",
+    "message": "jue.system.onMemoryWarning 触达时机跨端不可预测，请做降级释放逻辑。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "触达时机跨端不可预测，仅提示做降级释放逻辑。"
+  },
+  {
+    "name": "no-device-getdeviceid",
+    "target": "jue.device.getDeviceId",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"getDeviceId\"]",
+    "message": "jue.device.getDeviceId 在 iOS 需 jue ≥ 2.28.0、Android 需 jue ≥ 2.12.0，低于阈值请改用服务端下发匿名 ID。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.28.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.12.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.28.0，Android 需 jue ≥ 2.12.0。低于阈值改用服务端下发匿名 ID。"
+  },
+  {
+    "name": "no-device-getmodel",
+    "target": "jue.device.getModel",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"getModel\"]",
+    "message": "jue.device.getModel 需 jue ≥ 2.0.0 才支持。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-device-getscreenwidth",
+    "target": "jue.device.getScreenWidth",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"getScreenWidth\"]",
+    "message": "jue.device.getScreenWidth 在 iOS 需 jue ≥ 2.10.0、Android 需 jue ≥ 2.8.0，低于阈值请从布局层获取。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.10.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.8.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.10.0，Android 需 jue ≥ 2.8.0。低于阈值从布局层获取。"
+  },
+  {
+    "name": "no-device-getscreenheight",
+    "target": "jue.device.getScreenHeight",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"getScreenHeight\"]",
+    "message": "jue.device.getScreenHeight 在 iOS 需 jue ≥ 2.10.0、Android 需 jue ≥ 2.8.0，低于阈值请从布局层获取。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.10.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.8.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.10.0，Android 需 jue ≥ 2.8.0。低于阈值从布局层获取。"
+  },
+  {
+    "name": "no-device-getorientation",
+    "target": "jue.device.getOrientation",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"getOrientation\"]",
+    "message": "jue.device.getOrientation 在鸿蒙 ArkTS 不支持，请改用 jue.device.onOrientationChange 或 UI 自适应。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkTS 不支持。改用 jue.device.onOrientationChange 或 UI 自适应。"
+  },
+  {
+    "name": "no-device-onorientationchange",
+    "target": "jue.device.onOrientationChange",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"onOrientationChange\"]",
+    "message": "jue.device.onOrientationChange 事件触发语义跨端不一致，请做防抖与去重。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "事件触发语义跨端不一致，仅提示做防抖与去重。"
+  },
+  {
+    "name": "no-device-getsystemlanguage",
+    "target": "jue.device.getSystemLanguage",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"getSystemLanguage\"]",
+    "message": "jue.device.getSystemLanguage 在 iOS 需 jue ≥ 2.22.0、Android 需 jue ≥ 2.16.0，低于阈值请从本地缓存读取用户设定。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.22.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.16.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.22.0，Android 需 jue ≥ 2.16.0。低于阈值从本地缓存读取用户设定。"
+  },
+  {
+    "name": "no-device-getdeviceinfo",
+    "target": "jue.device.getDeviceInfo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"getDeviceInfo\"]",
+    "message": "jue.device.getDeviceInfo 需 jue ≥ 2.30.0 才支持，低于阈值请逐字段获取。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.30.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.30.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.30.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.30.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.30.0 才支持。合并式设备信息，低于阈值逐字段获取。"
+  },
+  {
+    "name": "no-device-setkeepscreenon",
+    "target": "jue.device.setKeepScreenOn",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"setKeepScreenOn\"]",
+    "message": "jue.device.setKeepScreenOn 在 iOS 需 jue ≥ 2.50.0、Android 需 jue ≥ 2.42.0，低于阈值请勿调用并提示。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.50.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.42.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.50.0，Android 需 jue ≥ 2.42.0。低于阈值不调用并提示。"
+  },
+  {
+    "name": "no-device-getidfv",
+    "target": "jue.device.getIdfv",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"device\"][callee.property.name=\"getIdfv\"]",
+    "message": "jue.device.getIdfv 为 iOS 专属标识，其它端无等价物，请走平台分支。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "iOS 专属标识，其它端无等价物，仅提示走平台分支。"
+  },
+  {
+    "name": "no-network-request-below-min-version",
+    "target": "jue.network.request",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"request\"]",
+    "message": "jue.network.request 需要所有端 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。统一网络请求入口。"
+  },
+  {
+    "name": "no-network-get-below-min-version",
+    "target": "jue.network.get",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"get\"]",
+    "message": "jue.network.get 需要所有端 jue ≥ 2.5.0，更早版本请用 request 指定 method。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.5.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.5.0 才支持。更早版本用 request 指定 method。"
+  },
+  {
+    "name": "no-network-post-below-min-version",
+    "target": "jue.network.post",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"post\"]",
+    "message": "jue.network.post 需要所有端 jue ≥ 2.5.0，更早版本请用 request 指定 method。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.5.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.5.0 才支持。更早版本用 request 指定 method。"
+  },
+  {
+    "name": "no-network-uploadfile-below-min-version",
+    "target": "jue.network.uploadFile",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"uploadFile\"]",
+    "message": "jue.network.uploadFile 需要 iOS jue ≥ 2.30.0、Android jue ≥ 2.18.0，低于阈值请禁用上传或走 request 分包。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.30.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.18.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.30.0，Android 需 jue ≥ 2.18.0。低于阈值禁用上传或走 request 分包。"
+  },
+  {
+    "name": "no-network-downloadfile-below-min-version",
+    "target": "jue.network.downloadFile",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"downloadFile\"]",
+    "message": "jue.network.downloadFile 需要 iOS jue ≥ 2.30.0、Android jue ≥ 2.18.0，低于阈值请禁用下载。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.30.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.18.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.30.0，Android 需 jue ≥ 2.18.0。低于阈值禁用下载。"
+  },
+  {
+    "name": "no-network-connectsocket-on-harmony",
+    "target": "jue.network.connectSocket",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"connectSocket\"]",
+    "message": "鸿蒙 ArkTS 不支持 jue.network.connectSocket，请改用轮询或第三方长连接 SDK。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkTS 不支持。改用轮询或第三方长连接 SDK。"
+  },
+  {
+    "name": "no-network-sendsocketmessage-on-harmony",
+    "target": "jue.network.sendSocketMessage",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"sendSocketMessage\"]",
+    "message": "鸿蒙 ArkTS 不支持 jue.network.sendSocketMessage，与 connectSocket 成对禁用。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkTS 不支持。与 connectSocket 成对禁用。"
+  },
+  {
+    "name": "no-network-onsocketmessage-cross-platform",
+    "target": "jue.network.onSocketMessage",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"onSocketMessage\"]",
+    "message": "jue.network.onSocketMessage 回调触达频率跨端不一致，请合并处理。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "回调触达频率跨端不一致，仅提示合并处理。"
+  },
+  {
+    "name": "no-network-getnetworktype-below-min-version",
+    "target": "jue.network.getNetworkType",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"getNetworkType\"]",
+    "message": "jue.network.getNetworkType 需要所有端 jue ≥ 2.5.0，且与 jue.system.getNetworkType 二选一，避免重复。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.5.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.5.0 才支持。与 jue.system.getNetworkType 二选一，避免重复。"
+  },
+  {
+    "name": "no-network-cancelall-platform-incomplete",
+    "target": "jue.network.cancelAll",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"network\"][callee.property.name=\"cancelAll\"]",
+    "message": "jue.network.cancelAll 平台支持不完整，请按端实现取消机制。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "平台支持不完整，仅提示按端实现取消机制。"
+  },
+  {
+    "name": "storage-set-min-version",
+    "target": "jue.storage.set",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"storage\"][callee.property.name=\"set\"]",
+    "message": "jue.storage.set 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "storage-get-min-version",
+    "target": "jue.storage.get",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"storage\"][callee.property.name=\"get\"]",
+    "message": "jue.storage.get 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "storage-remove-min-version",
+    "target": "jue.storage.remove",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"storage\"][callee.property.name=\"remove\"]",
+    "message": "jue.storage.remove 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "storage-setsync-min-version",
+    "target": "jue.storage.setSync",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"storage\"][callee.property.name=\"setSync\"]",
+    "message": "jue.storage.setSync 在 iOS 需 jue ≥ 2.12.0，Android 需 jue ≥ 2.10.0；低于阈值请改用异步 set。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.12.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.10.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.12.0，Android 需 jue ≥ 2.10.0。低于阈值改用异步 set。"
+  },
+  {
+    "name": "storage-getsync-min-version",
+    "target": "jue.storage.getSync",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"storage\"][callee.property.name=\"getSync\"]",
+    "message": "jue.storage.getSync 在 iOS 需 jue ≥ 2.12.0，Android 需 jue ≥ 2.10.0；低于阈值请改用异步 get。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.12.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.10.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.12.0，Android 需 jue ≥ 2.10.0。低于阈值改用异步 get。"
+  },
+  {
+    "name": "no-storage-getstorageinfo-harmony",
+    "target": "jue.storage.getStorageInfo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"storage\"][callee.property.name=\"getStorageInfo\"]",
+    "message": "鸿蒙 ArkTS 不支持 jue.storage.getStorageInfo，请自行统计占用。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkTS 不支持。低于阈值自行统计占用。"
+  },
+  {
+    "name": "storage-clear-confirm",
+    "target": "jue.storage.clear",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"storage\"][callee.property.name=\"clear\"]",
+    "message": "jue.storage.clear 全量清空跨端语义不同，请二次确认清空范围。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "清空范围跨端语义不同，仅提示二次确认。"
+  },
+  {
+    "name": "no-ui-toast-low-version",
+    "target": "jue.ui.toast",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"ui\"][callee.property.name=\"toast\"]",
+    "message": "jue.ui.toast 需要 jue ≥ 2.0.0，当前版本过低，请升级 jue SDK。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-ui-showloading-low-version",
+    "target": "jue.ui.showLoading",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"ui\"][callee.property.name=\"showLoading\"]",
+    "message": "jue.ui.showLoading 需要 jue ≥ 2.0.0，当前版本过低，请升级 jue SDK。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-ui-hideloading-low-version",
+    "target": "jue.ui.hideLoading",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"ui\"][callee.property.name=\"hideLoading\"]",
+    "message": "jue.ui.hideLoading 需要 jue ≥ 2.0.0，当前版本过低，请升级 jue SDK。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-ui-showmodal-low-version",
+    "target": "jue.ui.showModal",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"ui\"][callee.property.name=\"showModal\"]",
+    "message": "jue.ui.showModal 在 iOS 需 jue ≥ 2.15.0，Android 需 jue ≥ 2.8.0，低于阈值请改用 toast 替代。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.15.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.8.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.15.0，Android 需 jue ≥ 2.8.0。低于阈值用 toast 替代。"
+  },
+  {
+    "name": "no-ui-showactionsheet-low-version",
+    "target": "jue.ui.showActionSheet",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"ui\"][callee.property.name=\"showActionSheet\"]",
+    "message": "jue.ui.showActionSheet 在 iOS 需 jue ≥ 2.15.0，Android 需 jue ≥ 2.8.0，低于阈值禁用。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.15.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.8.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.15.0，Android 需 jue ≥ 2.8.0。低于阈值禁用。"
+  },
+  {
+    "name": "no-ui-setnavigationbartitle-harmony",
+    "target": "jue.ui.setNavigationBarTitle",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"ui\"][callee.property.name=\"setNavigationBarTitle\"]",
+    "message": "鸿蒙 ArkUI 不支持 jue.ui.setNavigationBarTitle，请使用自定义标题栏组件。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkUI 不支持，须用自定义标题栏组件。"
+  },
+  {
+    "name": "no-ui-showtabbar-low-version",
+    "target": "jue.ui.showTabBar",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"ui\"][callee.property.name=\"showTabBar\"]",
+    "message": "jue.ui.showTabBar 在 iOS 需 jue ≥ 2.35.0，Android 需 jue ≥ 2.30.0，低于阈值请隐藏入口。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.35.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.30.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.35.0，Android 需 jue ≥ 2.30.0。低于阈值隐藏入口。"
+  },
+  {
+    "name": "no-ui-animateto-cross-platform",
+    "target": "jue.ui.animateTo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"ui\"][callee.property.name=\"animateTo\"]",
+    "message": "jue.ui.animateTo 动画参数跨端兼容性不确定，请做好降级处理。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "动画参数跨端兼容性不确定，仅提示做降级。"
+  },
+  {
+    "name": "no-router-navigateto-low-version",
+    "target": "jue.router.navigateTo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"router\"][callee.property.name=\"navigateTo\"]",
+    "message": "jue.router.navigateTo 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-router-redirectto-low-version",
+    "target": "jue.router.redirectTo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"router\"][callee.property.name=\"redirectTo\"]",
+    "message": "jue.router.redirectTo 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-router-navigateback-low-version",
+    "target": "jue.router.navigateBack",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"router\"][callee.property.name=\"navigateBack\"]",
+    "message": "jue.router.navigateBack 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-router-switchtab-low-version",
+    "target": "jue.router.switchTab",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"router\"][callee.property.name=\"switchTab\"]",
+    "message": "jue.router.switchTab 在 iOS 需 jue ≥ 2.20.0，Android 需 jue ≥ 2.15.0，低于阈值禁用 tab 切换。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.20.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.15.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.20.0，Android 需 jue ≥ 2.15.0。低于阈值禁用 tab 切换。"
+  },
+  {
+    "name": "no-router-relaunch-low-version",
+    "target": "jue.router.reLaunch",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"router\"][callee.property.name=\"reLaunch\"]",
+    "message": "jue.router.reLaunch 在 iOS 需 jue ≥ 2.20.0，Android 需 jue ≥ 2.15.0，低于阈值请用 navigateBack 循环返回。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.20.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.15.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.20.0，Android 需 jue ≥ 2.15.0。低于阈值用 navigateBack 循环返回。"
+  },
+  {
+    "name": "no-router-getroutes-unstable",
+    "target": "jue.router.getRoutes",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"router\"][callee.property.name=\"getRoutes\"]",
+    "message": "jue.router.getRoutes 返回结构跨端不一致，请做类型断言。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "返回结构跨端不一致，仅提示做类型断言。"
+  },
+  {
+    "name": "no-router-prenavigate-unstable",
+    "target": "jue.router.preNavigate",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"router\"][callee.property.name=\"preNavigate\"]",
+    "message": "jue.router.preNavigate 预加载能力平台不确定，请做开关处理。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "预加载能力平台不确定，仅提示做开关。"
+  },
+  {
+    "name": "no-media-chooseimage-low-version",
+    "target": "jue.media.chooseImage",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"media\"][callee.property.name=\"chooseImage\"]",
+    "message": "jue.media.chooseImage 需要 jue ≥ 2.0.0，当前版本过低，请升级 SDK。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-media-previewimage-low-version",
+    "target": "jue.media.previewImage",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"media\"][callee.property.name=\"previewImage\"]",
+    "message": "jue.media.previewImage 需要 jue ≥ 2.0.0，当前版本过低，请升级 SDK。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-media-saveimage-low-version",
+    "target": "jue.media.saveImage",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"media\"][callee.property.name=\"saveImage\"]",
+    "message": "jue.media.saveImage 在 iOS 需 jue ≥ 2.25.0、Android 需 jue ≥ 2.10.0，当前版本过低，已禁用保存。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.25.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.10.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.25.0，Android 需 jue ≥ 2.10.0。低于阈值禁用保存。"
+  },
+  {
+    "name": "no-media-getrecorder-harmony",
+    "target": "jue.media.getRecorder",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"media\"][callee.property.name=\"getRecorder\"]",
+    "message": "鸿蒙 ArkTS 不支持 jue.media.getRecorder，请改用自带录音权限流程。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkTS 不支持。改用自带录音权限流程。"
+  },
+  {
+    "name": "no-media-playvoice-low-version",
+    "target": "jue.media.playVoice",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"media\"][callee.property.name=\"playVoice\"]",
+    "message": "jue.media.playVoice 在 iOS 需 jue ≥ 2.40.0、Android 需 jue ≥ 2.35.0，当前版本过低，请使用 H5 audio 兜底。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.40.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.35.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.40.0，Android 需 jue ≥ 2.35.0。低于阈值用 H5 audio 兜底。"
+  },
+  {
+    "name": "no-media-choosevideo-low-version",
+    "target": "jue.media.chooseVideo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"media\"][callee.property.name=\"chooseVideo\"]",
+    "message": "jue.media.chooseVideo 在 iOS 需 jue ≥ 2.45.0、Android 需 jue ≥ 2.40.0，当前版本过低，仅允许选图片。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.45.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.40.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.45.0，Android 需 jue ≥ 2.40.0。低于阈值仅允许选图片。"
+  },
+  {
+    "name": "no-media-getcamera-permission-hint",
+    "target": "jue.media.getCamera",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"media\"][callee.property.name=\"getCamera\"]",
+    "message": "jue.media.getCamera 权限名与流程跨端不一致，建议统一封装权限申请。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "权限名与流程跨端不一致，仅提示统一封装。"
+  },
+  {
+    "name": "no-location-getlocation",
+    "target": "jue.location.getLocation",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"location\"][callee.property.name=\"getLocation\"]",
+    "message": "jue.location.getLocation 需要 jue ≥ 2.0.0，请升级 SDK 后再使用。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-location-openlocation",
+    "target": "jue.location.openLocation",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"location\"][callee.property.name=\"openLocation\"]",
+    "message": "jue.location.openLocation 需要 iOS jue ≥ 2.30.0、Android jue ≥ 2.20.0，低于阈值请隐藏查看地图入口。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.30.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.20.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.30.0，Android 需 jue ≥ 2.20.0。低于阈值隐藏查看地图入口。"
+  },
+  {
+    "name": "no-location-chooselocation",
+    "target": "jue.location.chooseLocation",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"location\"][callee.property.name=\"chooseLocation\"]",
+    "message": "鸿蒙 ArkTS 不支持 jue.location.chooseLocation，请改用列表选择 + 手动坐标。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkTS 不支持。改用列表选择 + 手动坐标。"
+  },
+  {
+    "name": "no-file-savefile",
+    "target": "jue.file.saveFile",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"file\"][callee.property.name=\"saveFile\"]",
+    "message": "jue.file.saveFile 需要 iOS jue ≥ 2.18.0、Android jue ≥ 2.10.0，低于阈值请禁用文件保存。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.18.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.10.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.18.0，Android 需 jue ≥ 2.10.0。低于阈值禁用文件保存。"
+  },
+  {
+    "name": "no-file-getfileinfo",
+    "target": "jue.file.getFileInfo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"file\"][callee.property.name=\"getFileInfo\"]",
+    "message": "jue.file.getFileInfo 需要 jue ≥ 2.15.0，请升级 SDK 后再使用。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.15.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.15.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.15.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.15.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.15.0 才支持。"
+  },
+  {
+    "name": "no-file-readfile",
+    "target": "jue.file.readFile",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"file\"][callee.property.name=\"readFile\"]",
+    "message": "jue.file.readFile 需要 iOS jue ≥ 2.18.0、Android jue ≥ 2.10.0，低于阈值请走服务端读取。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.18.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.10.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.18.0，Android 需 jue ≥ 2.10.0。低于阈值走服务端读取。"
+  },
+  {
+    "name": "no-file-writefile",
+    "target": "jue.file.writeFile",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"file\"][callee.property.name=\"writeFile\"]",
+    "message": "jue.file.writeFile 需要 iOS jue ≥ 2.18.0、Android jue ≥ 2.10.0，低于阈值请禁用写入。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.18.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.10.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.18.0，Android 需 jue ≥ 2.10.0。低于阈值禁用写入。"
+  },
+  {
+    "name": "no-clipboard-setclipboarddata",
+    "target": "jue.clipboard.setClipboardData",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"clipboard\"][callee.property.name=\"setClipboardData\"]",
+    "message": "jue.clipboard.setClipboardData 需要 jue ≥ 2.0.0，请升级 SDK 后再使用。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-clipboard-getclipboarddata",
+    "target": "jue.clipboard.getClipboardData",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"clipboard\"][callee.property.name=\"getClipboardData\"]",
+    "message": "jue.clipboard.getClipboardData 需要 jue ≥ 2.8.0，更早版本不支持读取。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.8.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.8.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.8.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.8.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.8.0 才支持。更早版本不支持读取。"
+  },
+  {
+    "name": "no-share-shareappmessage",
+    "target": "jue.share.shareAppMessage",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"share\"][callee.property.name=\"shareAppMessage\"]",
+    "message": "jue.share.shareAppMessage 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-share-sharetotimeline",
+    "target": "jue.share.shareToTimeline",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"share\"][callee.property.name=\"shareToTimeline\"]",
+    "message": "jue.share.shareToTimeline 在 iOS 需 jue ≥ 2.20.0，Android 需 jue ≥ 2.12.0，低于阈值请隐藏时间线分享。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.20.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.12.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.20.0，Android 需 jue ≥ 2.12.0。低于阈值隐藏时间线分享。"
+  },
+  {
+    "name": "no-share-showsharemenu",
+    "target": "jue.share.showShareMenu",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"share\"][callee.property.name=\"showShareMenu\"]",
+    "message": "鸿蒙 ArkTS 不支持 jue.share.showShareMenu，请改用自定义分享面板。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkTS 不支持。改用自定义分享面板。"
+  },
+  {
+    "name": "no-login-login",
+    "target": "jue.login.login",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"login\"][callee.property.name=\"login\"]",
+    "message": "jue.login.login 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-login-getuserinfo",
+    "target": "jue.login.getUserInfo",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"login\"][callee.property.name=\"getUserInfo\"]",
+    "message": "jue.login.getUserInfo 在 iOS 需 jue ≥ 2.30.0，Android 需 jue ≥ 2.25.0，低于阈值请从服务端拉取用户资料。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.30.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.25.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.30.0，Android 需 jue ≥ 2.25.0。低于阈值从服务端拉取用户资料。"
+  },
+  {
+    "name": "no-login-checksession",
+    "target": "jue.login.checkSession",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"login\"][callee.property.name=\"checkSession\"]",
+    "message": "jue.login.checkSession 需要 jue ≥ 2.10.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.10.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.10.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.10.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.10.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.10.0 才支持。"
+  },
+  {
+    "name": "no-login-logout",
+    "target": "jue.login.logout",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"login\"][callee.property.name=\"logout\"]",
+    "message": "jue.login.logout 需要 jue ≥ 2.10.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.10.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.10.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.10.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.10.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.10.0 才支持。"
+  },
+  {
+    "name": "no-pay-requestpayment",
+    "target": "jue.pay.requestPayment",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"pay\"][callee.property.name=\"requestPayment\"]",
+    "message": "jue.pay.requestPayment 在 iOS 需 jue ≥ 2.35.0，Android 需 jue ≥ 2.30.0，低于阈值请禁用支付入口。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.35.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.30.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "iOS 需 jue ≥ 2.35.0，Android 需 jue ≥ 2.30.0。低于阈值禁用支付入口。"
+  },
+  {
+    "name": "no-pay-queryorder",
+    "target": "jue.pay.queryOrder",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"pay\"][callee.property.name=\"queryOrder\"]",
+    "message": "jue.pay.queryOrder 订单查询字段跨端不确定，请做字段兼容处理。",
+    "conditions": [],
+    "level": "warn",
+    "onResolveFail": "warn",
+    "evidence": "订单查询字段跨端不确定，仅提示做字段兼容。"
+  },
+  {
+    "name": "min-version-event-on",
+    "target": "jue.event.on",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"event\"][callee.property.name=\"on\"]",
+    "message": "jue.event.on 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "min-version-event-off",
+    "target": "jue.event.off",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"event\"][callee.property.name=\"off\"]",
+    "message": "jue.event.off 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "min-version-event-emit",
+    "target": "jue.event.emit",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"event\"][callee.property.name=\"emit\"]",
+    "message": "jue.event.emit 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "no-event-once-harmony",
+    "target": "jue.event.once",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"event\"][callee.property.name=\"once\"]",
+    "message": "鸿蒙 ArkTS 不支持 jue.event.once，请改用 on + 手动 off。",
+    "conditions": [
+      {
+        "kind": "unsupported",
+        "platform": "harmony"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "鸿蒙 ArkTS 不支持。改用 on + 手动 off。"
+  },
+  {
+    "name": "min-version-analytics-track",
+    "target": "jue.analytics.track",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"analytics\"][callee.property.name=\"track\"]",
+    "message": "jue.analytics.track 需要 jue ≥ 2.0.0，请升级 SDK 版本。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.0.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.0.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.0.0 才支持。"
+  },
+  {
+    "name": "min-version-analytics-track-event",
+    "target": "jue.analytics.trackEvent",
+    "selector": "CallExpression[callee.object.object.name=\"jue\"][callee.object.property.name=\"analytics\"][callee.property.name=\"trackEvent\"]",
+    "message": "jue.analytics.trackEvent 需要 jue ≥ 2.5.0，更早版本请用 track 兜底。",
+    "conditions": [
+      {
+        "kind": "min_version",
+        "platform": "h5",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "android",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "ios",
+        "minVersion": "2.5.0"
+      },
+      {
+        "kind": "min_version",
+        "platform": "harmony",
+        "minVersion": "2.5.0"
+      }
+    ],
+    "level": "error",
+    "onResolveFail": "warn",
+    "evidence": "所有端 jue ≥ 2.5.0 才支持。更早版本用 track 兜底。"
+  }
+]

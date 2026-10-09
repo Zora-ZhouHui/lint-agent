@@ -23,17 +23,18 @@
     "lint-agent": "./dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "rm -rf dist && tsc",
     "dev": "tsx src/cli/index.ts",
     "generate": "tsx src/cli/index.ts generate --from examples/input/cross-platform-pitfalls.md",
-    "generate:state": "tsx src/cli/index.ts generate --from examples/input/cross-platform-pitfalls.md --planner state",
-    "eval": "tsx src/cli/index.ts eval --from examples/input/cross-platform-pitfalls.md --expect examples/expected/expected-rules.json",
-    "typecheck": "tsc --noEmit",
+    "eval": "tsx src/cli/index.ts eval --from examples/input/cross-platform-pitfalls.md",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
     "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "verify:lint": "tsx verify/verify.mjs"
+    "verify:lint": "tsx verify/verify.mjs",
+    "snapshot:backfill-evidence": "tsx verify/backfill-evidence.mjs",
+    "constraints:snapshot": "cp output/constraints.json examples/expected/constraints.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
@@ -41,9 +42,11 @@
     "commander": "^13.1.0",
     "eslint": "^9.39.5",
     "openai": "^4.82.0",
-    "zod": "^3.24.2"
+    "zod": "^3.24.2",
+    "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
+    "@types/estree": "^1.0.9",
     "@types/node": "^22.13.1",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.9",

@@ -1,4 +1,4 @@
-// 终端彩色日志（关键要求 8：终端友好）
+// 终端彩色日志
 import chalk from 'chalk';
 
 export const logger = {

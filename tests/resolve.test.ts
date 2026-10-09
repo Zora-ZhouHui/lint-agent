@@ -29,11 +29,13 @@ const guards = makeEngineConfig().guards;
 function constraint(overrides: Partial<Constraint>): Constraint {
   return {
     name: 'no-x',
+    target: 'jue.x',
     selector: 'x',
     message: 'x',
     conditions: [{ kind: 'min_version', platform: 'ios', minVersion: '2.25.0' }],
     level: 'error',
     onResolveFail: 'warn',
+    evidence: 'iOS 需 jue ≥ 2.25.0',
     ...overrides,
   };
 }
