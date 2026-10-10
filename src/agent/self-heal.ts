@@ -46,11 +46,12 @@ function severityOf(msgs: Linter.LintMessage[]): ScenarioExpect {
 }
 
 /**
- * 单条约束的引擎自检（通电测试）：对合成出的全部场景逐个跑真实 Linter，
- * 任一实际输出与场景期望不符即失败。
- * 注意：期望由约束数据自身推导，这里只验证引擎接线（selector/解析/severity），
- * 不验证数据正确性——数据对不对由 eval --semantic 的文档差分（agent/oracle.ts）负责。
- * 返回 null=通过，否则返回带不匹配场景的完整失败详情。
+ * 单条约束的引擎自检：验证该约束接到真实 ESLint 引擎上能否按预期触发。
+ * 做法：为该约束合成一组场景（每段代码 + 一个期望输出 error/warn/ok），
+ * 逐段跑 linter.verify 并把实际消息归约为三态，与期望比对；
+ * 全部一致返回 null，否则返回带失配场景的失败详情。
+ * 边界：期望由约束数据自身推导，这里只查引擎链路通不通（selector 能否命中、
+ * 版本/平台解析、severity 归约），查不了数据本身对不对——那由 verifySemantics 语义评审负责。
  */
 function verifyBehavior(
   constraint: Constraint,

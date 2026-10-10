@@ -2,7 +2,7 @@
 // 没有 planner / reflector / 状态机循环——提取完成即结束。失败不中断，落盘 trace 后带 error 交回上层。
 import type { LLMClient } from '../llm/client.js';
 import type { AgentStep, Constraint, ConstraintConflict } from '../types/index.js';
-import { extractPatterns } from '../skills/index.js';
+import { extractPatterns } from '../skills/extract-patterns.js';
 import { Tracer } from './trace.js';
 
 export interface ExtractionOptions {

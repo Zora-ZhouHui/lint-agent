@@ -1,24 +1,9 @@
 import { z } from 'zod';
 
-// ---------- 基础类型 ----------
-
-/**
- * 受影响的端（唯一真相源）。
- * 收敛为 DSL 跨端的四个目标运行时：H5 / Android / iOS / 鸿蒙。
- */
 export const PLATFORM_VALUES = ['h5', 'android', 'ios', 'harmony'] as const;
-
 export type Platform = (typeof PLATFORM_VALUES)[number];
 
-// ---------- 文档提取：跨端约束（纯数据行） ----------
 
-/**
- * 条件（L1/L2/L3 统一载体）：
- * - `unsupported`：某端完全不可用
- * - `min_version`：某端 ≥ minVersion 才可用（SDK 目录名，见 EngineConfig.order）
- *
- * 未来新增语义条件（import/类型/作用域）只扩 Condition，不动引擎。
- */
 export type Condition =
   | { kind: 'unsupported'; platform: Platform }
   | { kind: 'min_version'; platform: Platform; minVersion: string };
@@ -33,12 +18,7 @@ export type Level = 'error' | 'warn';
 /** 版本/平台解析失败时的降级策略：降级为 warn，或直接跳过（不报）。 */
 export type ResolveFail = 'warn' | 'skip';
 
-/**
- * 一条约束 = 一行数据（LLM 唯一产物，不再生成规则代码）：
- * - `conditions: []` → 无条件全禁（L1）
- * - 平台/版本数据行 → L2
- * - 语义数据行 → 未来 L3
- */
+
 export interface Constraint {
   name: string; // 人读标识，kebab-case（展示 / 消息）
   target: string; // 确定性身份标识：SDK 挂载 API 路径，如 jue.system.getSystemInfo（去重与评估匹配键）

@@ -24,8 +24,6 @@ export const generateCommand = new Command('generate')
     const outputDir = path.resolve(opts.output);
     const doc = readFileText(opts.from);
 
-    // 引擎配置（repo 固定配置）：已存在则用（尊重 config 命令自定义），否则用默认 jue 配置，
-    // 其 sdkName 决定提取阶段 selector 的根标识。
     const engineConfigPath = path.join(outputDir, 'engine-config.json');
     const engineConfig = fs.existsSync(engineConfigPath)
       ? loadEngineConfig(engineConfigPath)
