@@ -18,9 +18,7 @@ const SNAPSHOT = path.join(ROOT, 'examples', 'expected', 'constraints.json');
 const DOC = path.join(ROOT, 'examples', 'input', 'cross-platform-pitfalls.md');
 const BATCH_SIZE = 20;
 
-const evidenceSchema = z.array(
-  z.object({ name: z.string().min(1), evidence: z.string().min(1) }),
-);
+const evidenceSchema = z.array(z.object({ name: z.string().min(1), evidence: z.string().min(1) }));
 
 /** 正则转义（target 含 . 等元字符）。 */
 function escapeRegExp(s) {
