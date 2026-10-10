@@ -151,20 +151,16 @@ describe('extractWithSelfHeal（自纠错闭环）', () => {
     expect(healCall?.content).toContain('文档内容');
   }, 30000);
 
-  it('行为失败修正：heal prompt 带合成用例代码与文档，修正后收敛', async () => {
-    // 引擎配置缺 ios 布尔 flag → min_version(ios) 的 fire 用例无守卫 → 解析降级 warn → fire 未命中
-    const configNoIosFlag = makeEngineConfig({
-      guards: {
-        booleanFlags: { isAndroid: 'android', isHarmony: 'harmony', isH5: 'h5' },
-        envVar: 'environment',
-        envValues: { ios: 'ios', android: 'android', harmony: 'harmony', h5: 'h5' },
-      },
-    });
+  it('行为失败修正：heal prompt 带不匹配场景代码与文档，修正后收敛', async () => {
+    // 引擎配置版本序为空 → 阈值场景 2.25.0 无法在清单中定位，compare 保守判违规，
+    // 「阈值版本应放行」场景期望 ok 实际 error → 引擎自检失败。
+    // 修正为 warn 级后只剩 warn-any 场景（命中即 warn），自检通过。
+    const configEmptyOrder = makeEngineConfig({ order: [] });
     const llm = new ScriptedHealLLM();
     llm.extractResult = [jueGetSystemInfoConstraint];
     llm.healBehaviorResult = [{ ...jueGetSystemInfoConstraint, level: 'warn' }];
 
-    const result = await extractWithSelfHeal(DOC_SINGLE, llm, configNoIosFlag, {
+    const result = await extractWithSelfHeal(DOC_SINGLE, llm, configEmptyOrder, {
       tracer: tracer(),
     });
 
@@ -172,11 +168,12 @@ describe('extractWithSelfHeal（自纠错闭环）', () => {
     expect(result.rounds).toHaveLength(2);
     expect(result.rounds[0].behaviorFailures).toHaveLength(1);
     expect(result.rounds[0].healedCount).toBe(1);
-    // P0-2：heal_behavior prompt 必须带失败约束的合成用例代码 + lint 输出 + 文档
+    // heal_behavior prompt 必须带不匹配场景代码 + 期望/实际差异 + 文档
     const healCall = llm.calls.find((c) => c.label === 'heal_behavior');
-    expect(healCall?.content).toContain('fire 用例');
+    expect(healCall?.content).toContain('场景');
     expect(healCall?.content).toContain('import jue from');
-    expect(healCall?.content).toContain('fire 未命中');
+    expect(healCall?.content).toContain('期望 ok');
+    expect(healCall?.content).toContain('实际 error');
     expect(healCall?.content).toContain('文档内容');
   }, 30000);
 

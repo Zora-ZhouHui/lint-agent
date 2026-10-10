@@ -1,7 +1,9 @@
-// 语义评审器（LLM-as-judge）：行为校验只能证明「引擎接线正确」（selector / 解析 / severity），
-// 证明不了「约束语义正确」——minVersion 抄错、platform 写偏、level 标错都能通过行为校验。
-// 这里用 LLM 对照文档原文逐条评审约束的忠实度（conditions / level / evidence / target），
-// 与行为校验、覆盖率校验互补，堵上「数据自洽但与文档不符」的最后一类缺口。
+// 语义评审器（LLM-as-judge，忠实度评审）：引擎自检只能证明「引擎按数据在跑」（selector /
+// 解析 / severity 接线），证明不了「数据忠于文档」——minVersion 抄错、platform 写偏、
+// level 标错时自检照样全绿。这里用 LLM 对照文档原文逐条评审约束忠实度
+// （conditions / level / evidence / target）。
+// 另有更强的文档差分（agent/oracle.ts，eval --semantic）：oracle 看不到约束数据、
+// 直判具体场景代码，与引擎真实判定差分，消除本评审「看着数据评数据」的锚定偏差。
 import type { LLMClient } from '../llm/client.js';
 import type { Constraint, SemanticFailure } from '../types/index.js';
 import { semanticVerdictArraySchema } from '../types/index.js';

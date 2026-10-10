@@ -1,4 +1,4 @@
-// 自纠错 Agent 闭环：extract → eval（覆盖率 + 行为 + 语义）→ self-heal（LLM 修正）→ 重复直到通过或达到 maxRounds
+// 自纠错 Agent 闭环：extract → eval（覆盖率 + 引擎自检 + 语义评审）→ self-heal（LLM 修正）→ 重复直到通过或达到 maxRounds
 // 这是项目的核心 Agent 能力：不是单次 LLM 调用，而是「感知 → 决策 → 行动」的闭环。
 // 设计取舍：决策空间离散且可枚举（删幻觉 / 补漏提 / 修语义 / 修行为），策略用确定性代码编码，
 // LLM 只在需要泛化的环节（提取 / 修正 / 评审）出场——可复现、可审计、成本可控。
@@ -16,7 +16,7 @@ import { constraintArraySchema } from '../types/index.js';
 import { extractConstraints } from './extract.js';
 import { Tracer } from './trace.js';
 import { computeCoverage } from '../engine/coverage.js';
-import { synthesizeCases } from '../engine/behavior.js';
+import { synthesizeScenarios, type ScenarioExpect } from '../engine/behavior.js';
 import { buildUnsupportedApiConfig } from '../engine/unsupported-api.js';
 import { targetToSelector } from '../engine/selector.js';
 import { healMissedPrompt, healBehaviorPrompt, healSemanticsPrompt } from '../llm/prompts.js';
@@ -38,50 +38,51 @@ type RawConstraint = Omit<Constraint, 'selector'> & { selector?: string };
 
 const linter = new Linter({ configType: 'flat' });
 
-function errorCount(msgs: Linter.LintMessage[]): number {
-  return msgs.filter((m) => m.severity === 2).length;
+/** 把 Linter 消息归约为 error / warn / ok 三态。 */
+function severityOf(msgs: Linter.LintMessage[]): ScenarioExpect {
+  if (msgs.some((m) => m.severity === 2)) return 'error';
+  if (msgs.some((m) => m.severity === 1)) return 'warn';
+  return 'ok';
 }
 
-/** 单条约束的行为校验：fire 必命中、not-fire 必放行。返回 null=通过，否则返回完整失败详情。 */
+/**
+ * 单条约束的引擎自检（通电测试）：对合成出的全部场景逐个跑真实 Linter，
+ * 任一实际输出与场景期望不符即失败。
+ * 注意：期望由约束数据自身推导，这里只验证引擎接线（selector/解析/severity），
+ * 不验证数据正确性——数据对不对由 eval --semantic 的文档差分（agent/oracle.ts）负责。
+ * 返回 null=通过，否则返回带不匹配场景的完整失败详情。
+ */
 function verifyBehavior(
   constraint: Constraint,
   config: EngineConfig,
 ): BehaviorFailureDetail | null {
-  const { fire, notFire } = synthesizeCases(constraint, config);
   const lintConfig = buildUnsupportedApiConfig([constraint], config);
+  const mismatches: BehaviorFailureDetail['mismatches'] = [];
 
-  const base: BehaviorFailureDetail = {
+  for (const scenario of synthesizeScenarios(constraint, config)) {
+    const actual = severityOf(linter.verify(scenario.code, lintConfig));
+    if (actual !== scenario.expect) {
+      mismatches.push({
+        scenarioId: scenario.id,
+        code: scenario.code,
+        expect: scenario.expect,
+        actual,
+      });
+    }
+  }
+
+  if (mismatches.length === 0) return null;
+  return {
     name: constraint.name,
     target: constraint.target,
-    reason: '',
+    reason: `${mismatches.length} 个场景实际判定与期望不符：${mismatches
+      .map((m) => `${m.scenarioId}(期望 ${m.expect} 实际 ${m.actual})`)
+      .join('、')}`,
     conditions: constraint.conditions,
     level: constraint.level,
     onResolveFail: constraint.onResolveFail,
+    mismatches,
   };
-
-  const fireMsgs = linter.verify(fire, lintConfig);
-  const fireOk = constraint.level === 'warn' ? fireMsgs.length > 0 : errorCount(fireMsgs) > 0;
-  if (!fireOk) {
-    return {
-      ...base,
-      reason: 'fire 未命中',
-      fire,
-      messages: fireMsgs.map((m) => m.message),
-    };
-  }
-
-  if (notFire !== null) {
-    const notFireMsgs = linter.verify(notFire, lintConfig);
-    if (errorCount(notFireMsgs) !== 0) {
-      return {
-        ...base,
-        reason: 'not-fire 被误报',
-        notFire,
-        messages: notFireMsgs.map((m) => m.message),
-      };
-    }
-  }
-  return null;
 }
 
 /** 批量行为校验：返回所有失败约束的完整详情。 */
@@ -164,7 +165,7 @@ export async function extractWithSelfHeal(
 
     const observation = allPassed
       ? `第 ${round} 轮：全部通过（${constraints.length} 条约束）`
-      : `第 ${round} 轮：漏提 ${coverage.missed.length}、幻觉 ${coverage.hallucinated.length}、行为失败 ${behaviorFailures.length}、语义失败 ${semanticFailures.length}`;
+      : `第 ${round} 轮：漏提 ${coverage.missed.length}、幻觉 ${coverage.hallucinated.length}、自检失败 ${behaviorFailures.length}、语义失败 ${semanticFailures.length}`;
 
     const healRound: HealRound = {
       round,
@@ -271,7 +272,7 @@ export async function extractWithSelfHeal(
       }
     }
 
-    // 4. 修正行为校验失败的约束（LLM 调用，带合成用例代码 + lint 输出 + 文档原文）
+    // 4. 修正引擎自检失败的约束（LLM 调用，带不匹配场景代码 + 期望/实际差异 + 文档原文）
     if (behaviorFailures.length > 0) {
       try {
         const raw = await llm.chatJSON(
@@ -358,7 +359,7 @@ export function printConvergenceTable(rounds: HealRound[], passed: boolean): voi
     '约束数',
     '漏提',
     '幻觉',
-    '行为失败',
+    '自检失败',
     '语义失败',
     '修正数',
     'LLM失败',

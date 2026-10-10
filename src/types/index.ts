@@ -64,7 +64,26 @@ export interface ConstraintConflict {
   variants: Constraint[];
 }
 
-/** 行为校验失败详情：带合成用例代码与 lint 实际输出，供 heal prompt 回喂完整失败上下文。 */
+/**
+ * 文档差分失败：oracle（只看文档的独立 LLM 判定）与引擎对同一场景代码的真实 lint
+ * 结果不一致。期望不来自约束自身，因此能抓「数据自洽但与文档不符」（平台/版本抄错）。
+ */
+export interface OracleFailure {
+  name: string;
+  target: string;
+  /** 场景标识（对应 EngineScenario.id） */
+  scenarioId: string;
+  /** 场景代码（同时喂给 oracle 与引擎，保证两边判的是同一段代码） */
+  code: string;
+  /** oracle 依据文档给出的独立判定：error / warn / ok */
+  oracle: 'error' | 'warn' | 'ok';
+  /** 引擎对该场景的真实 lint 结果：error / warn / ok */
+  actual: 'error' | 'warn' | 'ok';
+  /** oracle 判定理由（引用文档依据） */
+  oracleReason: string;
+}
+
+/** 行为校验（引擎自检）失败详情：带场景代码与期望/实际差异，供 heal prompt 回喂完整上下文。 */
 export interface BehaviorFailureDetail {
   name: string;
   target: string;
@@ -73,12 +92,13 @@ export interface BehaviorFailureDetail {
   conditions: Condition[];
   level: Level;
   onResolveFail: ResolveFail;
-  /** 合成出的必命中用例代码（fire 校验失败时给 LLM 看） */
-  fire?: string;
-  /** 合成出的必放行用例代码（not-fire 误报时给 LLM 看） */
-  notFire?: string;
-  /** lint 对用例的实际报告消息 */
-  messages?: string[];
+  /** 不匹配的自检场景（期望来自约束数据，实际来自真实 lint） */
+  mismatches: {
+    scenarioId: string;
+    code: string;
+    expect: 'error' | 'warn' | 'ok';
+    actual: 'error' | 'warn' | 'ok';
+  }[];
 }
 
 /**
@@ -226,6 +246,21 @@ export const semanticVerdictSchema = z.object({
 });
 
 export const semanticVerdictArraySchema = z.array(semanticVerdictSchema);
+
+/**
+ * 文档 oracle 对单个场景的独立判定：
+ * - error：文档明确该版本/端下不可用，静态检查应报 error
+ * - warn：文档只有废弃/迁移类提醒，应报 warn
+ * - ok：文档支持，应放行
+ * - unclear：文档未提及该 API 或无法判断该场景（差分跳过，不判失败）
+ */
+export const oracleVerdictSchema = z.object({
+  id: z.string().min(1),
+  verdict: z.enum(['error', 'warn', 'ok', 'unclear']),
+  reason: z.string().default(''),
+});
+
+export const oracleVerdictArraySchema = z.array(oracleVerdictSchema);
 
 export const engineConfigSchema = z.object({
   sdkName: z.string().min(1),

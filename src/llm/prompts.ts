@@ -112,7 +112,7 @@ export function healMissedPrompt(missedApis: string[], doc: string, sdkName: str
   ];
 }
 
-// ---------- heal_behavior（自纠错：修正行为校验失败的约束） ----------
+// ---------- heal_behavior（自纠错：修正引擎自检失败的约束） ----------
 
 export function healBehaviorPrompt(
   failures: BehaviorFailureDetail[],
@@ -123,11 +123,11 @@ export function healBehaviorPrompt(
     {
       role: 'system',
       content: [
-        '你是跨端约束提取专家。以下约束在行为校验中失败，请结合失败上下文修正后重新输出。',
+        '你是跨端约束提取专家。以下约束在引擎自检中失败（真实 ESLint 对场景代码的判定与约束数据期望不一致），请结合失败上下文修正后重新输出。',
         '',
         `sdkName：${sdkName}`,
         '',
-        '失败的约束（含完整数据、合成出的校验用例代码与 lint 实际报告）：',
+        '失败的约束（含完整数据、不匹配场景代码与期望/实际差异）：',
         ...failures.map((f) => {
           const lines = [
             `- name: ${f.name}`,
@@ -140,10 +140,10 @@ export function healBehaviorPrompt(
               onResolveFail: f.onResolveFail,
             })}`,
           ];
-          if (f.fire) lines.push(`  fire 用例（应命中却没命中）：\n${indent(f.fire)}`);
-          if (f.notFire) lines.push(`  not-fire 用例（应放行却被误报）：\n${indent(f.notFire)}`);
-          if (f.messages && f.messages.length > 0) {
-            lines.push(`  lint 实际报告：\n${indent(f.messages.map((m) => `- ${m}`).join('\n'))}`);
+          for (const m of f.mismatches) {
+            lines.push(
+              `  场景 ${m.scenarioId}（期望 ${m.expect}，实际 ${m.actual}）：\n${indent(m.code)}`,
+            );
           }
           return lines.join('\n');
         }),
@@ -152,11 +152,71 @@ export function healBehaviorPrompt(
         '- target 段数错误（应为 2 或 3 段）→ 修正 target',
         '- conditions 中的 platform 或 minVersion 与文档不一致 → 重新对照文档',
         '- level 设置不当 → 检查文档标注是 [硬校验] 还是 [提示]',
+        '- onResolveFail 设置不当 → 检查无守卫场景应降级为 warn 还是 skip',
         '',
         '请输出修正后的完整 JSON 约束数组（只包含需要修正的约束，每条含 evidence），不要输出解释。',
       ].join('\n'),
     },
     { role: 'user', content: `文档内容（修正必须忠实于它）：\n${doc}` },
+  ];
+}
+
+// ---------- oracle_behavior（文档差分：独立第二意见，看不到任何约束数据） ----------
+
+/** 送给 oracle 的场景视图：只有业务代码 + 人读上下文，绝不含约束期望/conditions。 */
+export interface OracleScenarioView {
+  /** 中性数字 id（如 scene-3）；禁止使用约束名，避免把提取结论泄漏给 oracle */
+  id: string;
+  /** 场景代码（与喂给引擎 Linter 的完全一致） */
+  code: string;
+  /** 人读上下文：SDK 版本与运行端，帮助 oracle 不必自行解析守卫 */
+  version: string;
+  platform: string;
+}
+
+/**
+ * 文档差分 oracle：只给文档 + 具体业务代码场景，让 LLM 以独立第二意见判定
+ * 每段代码在指定 SDK 版本/端下是否真的有问题。
+ *
+ * 关键：prompt 中不出现任何提取出的约束数据（conditions / level / 期望），
+ * 从根上消除「看着数据评审数据」的锚定偏差——它的判定与引擎结果同源度为零，
+ * 差分不一致才意味着「数据自洽但与文档不符」。
+ */
+export function oracleJudgePrompt(batch: OracleScenarioView[], doc: string): Message[] {
+  return [
+    {
+      role: 'system',
+      content: [
+        '你是严格的跨端 SDK 评审员。我会给你团队文档原文和若干段真实业务代码，每段代码标注了使用的 SDK 版本与运行端（H5 / Android / iOS / 鸿蒙）。',
+        '请只依据文档原文，独立判断每段代码调用该 API 在该版本、该端下是否会出问题。你看不到任何自动生成的规则，禁止猜测规则意图，只回答文档怎么说。',
+        '',
+        '判定四态：',
+        '- "error"：文档明确该端不支持该 API，或该端要求的最低 SDK 版本高于代码所用版本 → 静态检查必须报错拦截。',
+        '- "warn"：文档只有废弃、迁移提醒或跨端语义不确定的提示，没有硬性的版本/端门槛 → 应提醒但不拦截。',
+        '- "ok"：文档表明该端在该版本下可用（或文档明确全端支持）→ 应放行。',
+        '- "unclear"：文档完全没有提到这个 API，或没说清这个端/版本组合 → 无法判断（不要猜）。',
+        '',
+        '版本比较以文档给出的最低版本为准：代码版本 ≥ 最低版本才算可用。',
+        '每段代码都有平台守卫（如 if (isIOS)），表示该调用只会在标注的端上执行。',
+        '',
+        '输出 JSON 数组，每个输入场景对应一个判定：',
+        '[{ "id": "场景 id", "verdict": "error|warn|ok|unclear", "reason": "一句话依据，引用文档原文关键句" }]',
+        '',
+        '必须覆盖输入的每个场景（id 一一对应），不要遗漏、不要新增。',
+      ].join('\n'),
+    },
+    {
+      role: 'user',
+      content: [
+        `场景列表（共 ${batch.length} 个）：`,
+        ...batch.map(
+          (s) =>
+            `### ${s.id}\n版本：${s.version}　运行端：${s.platform}\n代码：\n${s.code.trimEnd()}`,
+        ),
+        '',
+        `文档原文：\n${doc}`,
+      ].join('\n\n'),
+    },
   ];
 }
 

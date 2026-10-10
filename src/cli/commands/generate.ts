@@ -62,7 +62,7 @@ export const generateCommand = new Command('generate')
       logger.warn(
         `自纠错未完全通过：漏提 ${result.finalMissed.length}、` +
           `幻觉 ${result.finalHallucinated.length}、` +
-          `行为失败 ${result.finalBehaviorFailures.length}、` +
+          `自检失败 ${result.finalBehaviorFailures.length}、` +
           `语义失败 ${result.finalSemanticFailures.length}（详见 trace）`,
       );
     }
