@@ -85,10 +85,7 @@ export const evalCommand = new Command('eval')
     '--config <file>',
     '引擎配置 JSON 路径（缺省读 <dir>/engine-config.json，再退回默认 jue 配置）',
   )
-  .option(
-    '--no-semantic',
-    '关闭语义层校验（默认开启：忠实度评审 + 文档差分，需 LLM API Key）',
-  )
+  .option('--no-semantic', '关闭语义层校验（默认开启：忠实度评审 + 文档差分，需 LLM API Key）')
   .action(async (opts: EvalOptions) => {
     const outputDir = path.resolve(opts.output);
     const constraintsPath = path.join(outputDir, 'constraints.json');
@@ -122,10 +119,10 @@ export const evalCommand = new Command('eval')
     const effectiveDocApis = coverage.docApiPaths.length - coverage.skippedInDoc.length;
     console.log(
       `文档 API：${coverage.docApiPaths.length} 条` +
-      (coverage.skippedInDoc.length > 0
-        ? `（其中 [跳过] ${coverage.skippedInDoc.length} 条，预期不提取）`
-        : '') +
-      ` / 生成 target：${coverage.generatedTargets.length} 条`,
+        (coverage.skippedInDoc.length > 0
+          ? `（其中 [跳过] ${coverage.skippedInDoc.length} 条，预期不提取）`
+          : '') +
+        ` / 生成 target：${coverage.generatedTargets.length} 条`,
     );
     if (coverage.missed.length > 0) {
       console.log(
@@ -165,18 +162,10 @@ export const evalCommand = new Command('eval')
     console.log(
       `\n结果：${constraints.length - selfCheckFailures.length}/${constraints.length} 条约束通过（共 ${scenarioTotal} 个场景）`,
     );
-    console.log(
-      '  ┌────────────────────────────────────────────────────────┐',
-    );
-    console.log(
-      '  │ ⚠ 自检只验引擎接线（selector/scope/severity）         │',
-    );
-    console.log(
-      '  │ 数据正确性（平台/版本是否忠于文档）由语义层负责       │',
-    );
-    console.log(
-      '  └────────────────────────────────────────────────────────┘',
-    );
+    console.log('  ┌────────────────────────────────────────────────────────┐');
+    console.log('  │ ⚠ 自检只验引擎接线（selector/scope/severity）         │');
+    console.log('  │ 数据正确性（平台/版本是否忠于文档）由语义层负责       │');
+    console.log('  └────────────────────────────────────────────────────────┘');
 
     // ---------- 第三层：语义层（默认开启，需 LLM API Key） ----------
     let semanticFailures: { name: string; target: string; issue: string }[] = [];
@@ -231,12 +220,12 @@ export const evalCommand = new Command('eval')
     console.log('\n======== Agent 质量评估 ========');
     console.log(
       `  覆盖率        ${coverageRate}` +
-      `  （漏提 ${coverage.missed.length} / 幻觉 ${coverage.hallucinated.length}）` +
-      `  ${coverageOk ? '✔' : '✘'}`,
+        `  （漏提 ${coverage.missed.length} / 幻觉 ${coverage.hallucinated.length}）` +
+        `  ${coverageOk ? '✔' : '✘'}`,
     );
     console.log(
       `  引擎自检      ${constraints.length - selfCheckFailures.length}/${constraints.length}` +
-      `  ${selfCheckOk ? '✔' : '✘'}`,
+        `  ${selfCheckOk ? '✔' : '✘'}`,
     );
     if (opts.noSemantic) {
       console.log('  语义忠实度    ---   ⚠ 已通过 --no-semantic 关闭');
@@ -247,19 +236,21 @@ export const evalCommand = new Command('eval')
     } else {
       console.log(
         `  语义忠实度    ${constraints.length - semanticFailures.length}/${constraints.length}` +
-        `  ${semanticFailures.length === 0 ? '✔' : '✘'}`,
+          `  ${semanticFailures.length === 0 ? '✔' : '✘'}`,
       );
       console.log(
         `  文档差分      ${oracleFailures.length === 0 ? '全部一致' : `${oracleFailures.length} 个不一致`}` +
-        `  ${oracleFailures.length === 0 ? '✔' : '✘'}`,
+          `  ${oracleFailures.length === 0 ? '✔' : '✘'}`,
       );
     }
 
     // 裁决：覆盖率 + 引擎自检必须通过；语义层若已运行也必须通过，未运行则标记"部分通过"
     const failReasons: string[] = [];
     if (coverage.missed.length > 0) failReasons.push(`${coverage.missed.length} 条漏提`);
-    if (coverage.hallucinated.length > 0) failReasons.push(`${coverage.hallucinated.length} 条幻觉`);
-    if (selfCheckFailures.length > 0) failReasons.push(`${selfCheckFailures.length} 条引擎自检失败`);
+    if (coverage.hallucinated.length > 0)
+      failReasons.push(`${coverage.hallucinated.length} 条幻觉`);
+    if (selfCheckFailures.length > 0)
+      failReasons.push(`${selfCheckFailures.length} 条引擎自检失败`);
     if (semanticRan && semanticFailures.length > 0)
       failReasons.push(`${semanticFailures.length} 条语义忠实度失败`);
     if (semanticRan && oracleFailures.length > 0)
@@ -282,13 +273,17 @@ export const evalCommand = new Command('eval')
         console.log(`    ✘ 幻觉：${coverage.hallucinated.join('、')}`);
       }
       for (const f of selfCheckFailures) {
-        console.log(`    ✘ 自检失败 ${f.name}：${f.mismatches.map((m) => `${m.scenarioId}(期望${m.expect}实际${m.actual})`).join('、')}`);
+        console.log(
+          `    ✘ 自检失败 ${f.name}：${f.mismatches.map((m) => `${m.scenarioId}(期望${m.expect}实际${m.actual})`).join('、')}`,
+        );
       }
       for (const f of semanticFailures) {
         console.log(`    ✘ 语义失败 ${f.name}（${f.target}）：${f.issue}`);
       }
       for (const f of oracleFailures) {
-        console.log(`    ✘ 差分失败 ${f.name}（${f.target}）场景 ${f.scenarioId}：文档 ${f.oracle}，引擎 ${f.actual}`);
+        console.log(
+          `    ✘ 差分失败 ${f.name}（${f.target}）场景 ${f.scenarioId}：文档 ${f.oracle}，引擎 ${f.actual}`,
+        );
       }
     }
 

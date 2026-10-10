@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { computeCoverage, extractApiPaths, extractSkippedApiPaths } from '../src/engine/coverage.js';
+import {
+  computeCoverage,
+  extractApiPaths,
+  extractSkippedApiPaths,
+} from '../src/engine/coverage.js';
 import type { Constraint } from '../src/types/index.js';
 
 function constraint(target: string): Constraint {

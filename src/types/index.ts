@@ -3,7 +3,6 @@ import { z } from 'zod';
 export const PLATFORM_VALUES = ['h5', 'android', 'ios', 'harmony'] as const;
 export type Platform = (typeof PLATFORM_VALUES)[number];
 
-
 export type Condition =
   | { kind: 'unsupported'; platform: Platform }
   | { kind: 'min_version'; platform: Platform; minVersion: string };
@@ -17,7 +16,6 @@ export type Level = 'error' | 'warn';
 
 /** 版本/平台解析失败时的降级策略：降级为 warn，或直接跳过（不报）。 */
 export type ResolveFail = 'warn' | 'skip';
-
 
 export interface Constraint {
   name: string; // 人读标识，kebab-case（展示 / 消息）
