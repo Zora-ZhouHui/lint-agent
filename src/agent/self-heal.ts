@@ -254,7 +254,7 @@ export async function extractWithSelfHeal(
     const coverage = computeCoverage(doc, constraints, sdkName);
     const versionProblems = unverifiedMinVersions(constraints, engineConfig);
     const behaviorFailures = verifyAllBehaviors(constraints, engineConfig);
-    
+
     const semanticCheck = await verifySemantics(doc, constraints, llm, sdkName);
     const semanticFailures = semanticCheck.failures;
 
