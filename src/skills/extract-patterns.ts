@@ -3,7 +3,7 @@ import type { LLMClient } from '../llm/client.js';
 import type { Constraint, ConstraintConflict } from '../types/index.js';
 import { constraintArraySchema } from '../types/index.js';
 import { extractPatternsPrompt } from '../llm/prompts.js';
-import { targetToSelector } from '../engine/selector.js';
+import { nameFromTarget, targetToSelector } from '../engine/selector.js';
 
 /**
  * 按 markdown 二级标题（##）把文档切成若干章节块，供分批提取。
@@ -88,10 +88,11 @@ export async function extractPatterns(
       // 单批输出远小于 8192；过高 max_tokens 亦受 deepseek-chat 输出上限约束。
       { label: 'extract_patterns', temperature: 0.1, maxTokens: 8192, structuredOutput: true },
     );
-    // selector 由 target 机械推导，不依赖 LLM 输出（杜绝层级写错）
+    // selector 与 name 均由 target 机械推导，不依赖 LLM 输出
+    // （selector 杜绝 AST 层级写错；name 杜绝 kebab-case 写错导致整批作废）
     for (const c of raw) {
       all.push({
-        name: c.name,
+        name: nameFromTarget(c.target, sdkName),
         target: c.target,
         selector: targetToSelector(c.target, sdkName),
         message: c.message,

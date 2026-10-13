@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   computeCoverage,
   extractApiPaths,
@@ -73,22 +74,51 @@ describe('computeCoverage（文档 vs 生成 target 差集）', () => {
 });
 
 describe('extractSkippedApiPaths（[跳过] 条目排除）', () => {
-  it('抽取标了 [跳过] 的 API 路径', () => {
-    const doc = '### jue.network.get [跳过]\njue.system.getSystemInfo [硬校验]';
+  it('抽取标了 [跳过] 的条目标题', () => {
+    const doc = '### 1. jue.network.get [跳过]\n### 2. jue.system.getSystemInfo [硬校验]';
     expect(extractSkippedApiPaths(doc)).toEqual(['jue.network.get']);
   });
 
   it('无 [跳过] 标记时返回空数组', () => {
-    expect(extractSkippedApiPaths('jue.system.getSystemInfo [硬校验]')).toEqual([]);
+    expect(extractSkippedApiPaths('### 1. jue.system.getSystemInfo [硬校验]')).toEqual([]);
   });
 });
 
 describe('computeCoverage（[跳过] 条目不计入 missed）', () => {
-  it('[跳过] 条目从 missed 中排除，列入 skippedInDoc', () => {
-    const doc = 'jue.network.get [跳过]\njue.system.getSystemInfo [硬校验]';
+  it('[跳过] 条目标题从 missed 中排除，列入 skippedInDoc', () => {
+    const doc = '### 1. jue.network.get [跳过]\n### 2. jue.system.getSystemInfo [硬校验]';
     const report = computeCoverage(doc, [constraint('jue.system.getSystemInfo')]);
     // jue.network.get 标了 [跳过]，不算漏提
     expect(report.missed).toEqual([]);
     expect(report.skippedInDoc).toEqual(['jue.network.get']);
+  });
+
+  it('同名 API 在别处是硬校验条目 → 不得被另一条 [跳过] 条目整体划走（漏提必须可见）', () => {
+    const doc = [
+      '### 23. jue.network.request [硬校验]',
+      '所有端 jue ≥ 2.0.0 才支持。',
+      '### 33. jue.network.request 并发上限控制 [跳过]',
+      '无法静态检测。',
+    ].join('\n');
+    expect(extractSkippedApiPaths(doc)).not.toContain('jue.network.request');
+    // 因此这条真 API 若漏提，必须出现在 missed 里，而不是双向隐身
+    expect(computeCoverage(doc, []).missed).toContain('jue.network.request');
+  });
+
+  it('图例 / 正文里的 [跳过] 字样不构成条目（只看 `### N.` 标题行）', () => {
+    const doc = [
+      '> - `[跳过]`：无法静态检测的语义模式 → 不校验，仅留档说明。',
+      '### 5. jue.foo.bar [跳过]',
+      '正文提到 jue.baz.qux 也标 [跳过]，但这一行不是条目标题。',
+    ].join('\n');
+    expect(extractSkippedApiPaths(doc)).toEqual(['jue.foo.bar']);
+  });
+
+  it('真实样例文档回归：jue.network.request 不再是「预期不提取」', () => {
+    const doc = readFileSync('examples/input/cross-platform-pitfalls.md', 'utf8');
+    const skipped = extractSkippedApiPaths(doc);
+    expect(skipped).not.toContain('jue.network.request');
+    // 确实只出现在 [跳过] 条目里的 API 仍被正确排除
+    expect(skipped).toContain('jue.ui.getBoundingClientRect');
   });
 });

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Linter } from 'eslint';
-import { synthesizeScenarios } from '../src/engine/behavior.js';
+import {
+  severityOf,
+  synthesizeScenarios,
+  uncoveredPlatforms,
+  unverifiedMinVersions,
+} from '../src/engine/behavior.js';
 import { buildUnsupportedApiConfig } from '../src/engine/unsupported-api.js';
 import { defaultEngineConfig } from '../src/engine/default-config.js';
 import type { Constraint } from '../src/types/index.js';
@@ -99,6 +104,33 @@ describe('synthesizeScenarios（引擎自检场景合成）', () => {
     expect(lintActual(noguard.code, c)).toBe('ok');
   });
 
+  it('内层守卫形态不认识时继续向外找平台守卫（嵌套 if 不再整体降级）', () => {
+    const c = jueGetSystemInfoConstraint;
+    // if (isIOS) { if (ready) { ... } } —— 内层 ready 不认识，但运行端仍是 iOS
+    const code = `import jue from './jue/2.22.0';\nif (isIOS) {\n  if (ready) {\n    jue.system.getSystemInfo();\n  }\n}\n`;
+    expect(lintActual(code, c)).toBe('error');
+  });
+
+  it('阈值等于版本清单最低项 → 不构造清单外假版本（.pre）', () => {
+    const lowest = defaultEngineConfig.order[0];
+    const c: Constraint = {
+      ...jueGetSystemInfoConstraint,
+      conditions: [{ kind: 'min_version', platform: 'ios', minVersion: lowest }],
+    };
+    const scenarios = synthesizeScenarios(c, defaultEngineConfig);
+    const ids = scenarios.map((s) => s.id);
+
+    // 不再伪造清单外的 `<minVersion>.pre`（它会与文档判定必然分歧，制造假阳性）
+    expect(scenarios.some((s) => s.code.includes('.pre'))).toBe(false);
+    // 阈值已是清单最低项 → 已知版本空间内不存在更低的合法版本，不硬造违规场景
+    expect(ids).not.toContain('min-ios-below');
+    // 阈值上场景仍保留，其余场景照常自洽
+    expect(ids).toContain('min-ios-at');
+    for (const s of scenarios) {
+      expect(lintActual(s.code, c)).toBe(s.expect);
+    }
+  });
+
   it('配置缺某端布尔守卫 → 该端 determinate 场景不硬造，其余场景仍自洽', () => {
     const config = {
       ...defaultEngineConfig,
@@ -115,5 +147,78 @@ describe('synthesizeScenarios（引擎自检场景合成）', () => {
     // 无守卫降级场景仍在（warn 策略）
     const noguard = scenarios.find((s) => s.id === 'noguard-resolve-fail')!;
     expect(noguard.expect).toBe('warn');
+  });
+});
+
+describe('uncoveredPlatforms（零覆盖端必须显式上报）', () => {
+  it('配置缺某端守卫 → 该端被列为零覆盖', () => {
+    const config = {
+      ...defaultEngineConfig,
+      guards: {
+        ...defaultEngineConfig.guards,
+        booleanFlags: { isIOS: 'ios', isAndroid: 'android', isH5: 'h5' },
+      },
+    } as typeof defaultEngineConfig;
+    const missing = uncoveredPlatforms(jueGetSystemInfoConstraint, config);
+    expect(missing).toEqual(['harmony']);
+    // 守卫齐全时不报零覆盖
+    expect(uncoveredPlatforms(jueGetSystemInfoConstraint, defaultEngineConfig)).toEqual([]);
+  });
+
+  it('minVersion 不在版本清单 → 显式上报（否则自检失败归因错误、且该约束未被正向验证）', () => {
+    const bad: Constraint = {
+      ...jueGetSystemInfoConstraint,
+      conditions: [{ kind: 'min_version', platform: 'ios', minVersion: '2.6.1' }],
+    };
+    const problems = unverifiedMinVersions([bad], defaultEngineConfig);
+    expect(problems).toEqual([
+      {
+        name: jueGetSystemInfoConstraint.name,
+        target: jueGetSystemInfoConstraint.target,
+        platform: 'ios',
+        minVersion: '2.6.1',
+      },
+    ]);
+
+    // 关键：清单外版本下「阈值下」场景根本生成不出来——该约束在已知版本空间内
+    // 一条「该拦」的场景都没有，因此必须靠这条归因检查补上，而不能只看自检通过率。
+    const ids = synthesizeScenarios(bad, defaultEngineConfig).map((s) => s.id);
+    expect(ids).not.toContain('min-ios-below');
+    expect(ids).toContain('min-ios-at');
+  });
+
+  it('minVersion 在清单内 → 不上报；清单最低项也不上报（只是无更低版本可构造）', () => {
+    expect(unverifiedMinVersions([jueGetSystemInfoConstraint], defaultEngineConfig)).toEqual([]);
+    const atLowest: Constraint = {
+      ...jueGetSystemInfoConstraint,
+      conditions: [{ kind: 'min_version', platform: 'ios', minVersion: '2.0.0' }],
+    };
+    expect(unverifiedMinVersions([atLowest], defaultEngineConfig)).toEqual([]);
+  });
+
+  it('unsupported 条件不参与版本清单检查', () => {
+    const c: Constraint = {
+      ...jueGetSystemInfoConstraint,
+      conditions: [{ kind: 'unsupported', platform: 'harmony' }],
+    };
+    expect(unverifiedMinVersions([c], defaultEngineConfig)).toEqual([]);
+  });
+
+  it('severityOf 是唯一的 error/warn/ok 归约口径（原先三处逐字重复）', () => {
+    // 该函数同时决定「自检实际输出」与「差分实际输出」，两处必须永远一致
+    expect(severityOf([])).toBe('ok');
+    expect(severityOf([{ severity: 1, message: 'w' } as never])).toBe('warn');
+    expect(severityOf([{ severity: 2, message: 'e' } as never])).toBe('error');
+    // 同时出现时以 error 优先（更严重者胜出）
+    expect(
+      severityOf([{ severity: 1, message: 'w' } as never, { severity: 2, message: 'e' } as never]),
+    ).toBe('error');
+  });
+
+  it('warn 级与 L1 全禁不按端展开 → 不存在端覆盖问题', () => {
+    const warnLevel: Constraint = { ...jueGetSystemInfoConstraint, level: 'warn' };
+    const l1: Constraint = { ...jueGetSystemInfoConstraint, conditions: [] };
+    expect(uncoveredPlatforms(warnLevel, defaultEngineConfig)).toEqual([]);
+    expect(uncoveredPlatforms(l1, defaultEngineConfig)).toEqual([]);
   });
 });

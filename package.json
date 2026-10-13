@@ -33,6 +33,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "verify:lint": "tsx verify/verify.mjs",
+    "forms:gap": "tsx verify/form-gap.mjs",
     "snapshot:backfill-evidence": "tsx verify/backfill-evidence.mjs",
     "constraints:snapshot": "cp output/constraints.json examples/expected/constraints.json"
   },

@@ -35,9 +35,8 @@ export function extractPatternsPrompt(doc: string, sdkName: string): Message[] {
         '- `[提示]`（天生提醒类：废弃迁移 / 平台差异不确定）→ "level": "warn"，"onResolveFail": "warn"',
         '- `[跳过]`（无法静态检测）→ 不提取',
         '',
-        'Constraint 结构（注意：selector 字段已移除，由引擎从 target 机械推导，你不需要输出 selector）：',
+        'Constraint 结构（注意：name 与 selector 都已移除，由引擎从 target 机械推导，你不需要输出）：',
         '{',
-        '  "name": "kebab-case 约束名，如 no-system-getsysteminfo",',
         '  "target": "该 API 的完整挂载路径，如 jue.system.getSystemInfo、jue.vibrate（与文档一致，勿臆造）",',
         '  "message": "违规时报告给开发者的提示语",',
         '  "conditions": [ ... ],',
@@ -53,7 +52,13 @@ export function extractPatternsPrompt(doc: string, sdkName: string): Message[] {
         '- 无条件全端禁用 → "conditions": []',
         '- 某端完全不支持 → { "kind": "unsupported", "platform": "ios" }',
         '- 某端低于某 SDK 版本不可用 → { "kind": "min_version", "platform": "ios", "minVersion": "2.25.0" }',
-        '文档说"所有端/全平台"时，conditions 固定输出 []（无条件全禁）。',
+        '文档说"所有端/全平台 jue ≥ X 才支持"时，表示**四端都要求最低版本**，必须逐端展开成 4 条 min_version：',
+        '  [{"kind":"min_version","platform":"h5","minVersion":"X"}, ...android/ios/harmony]',
+        '注意：',
+        '- "所有端 ≥ X" ≠ conditions: []。空数组的语义是「全端无条件禁用」（任何版本都违规），',
+        '  与「版本够就能用」正好相反，写错会把合规调用也拦下。',
+        '- "所有端均不支持该 API"（无版本条件）才是 conditions: []。',
+        '- 某端"部分机型不支持/需能力探测"→ 属提示类，用 level: "warn"，不要写成全端硬门槛。',
         '',
         'target 格式要求：',
         `- 2 段（无模块名）：${sdkName}.method，如 jue.vibrate`,
@@ -68,12 +73,12 @@ export function extractPatternsPrompt(doc: string, sdkName: string): Message[] {
         '示例 1（2 段路径 + min_version）：',
         '文档片段：「jue.vibrate() [硬校验] iOS 需 2.25.0 以上版本」',
         '输出：',
-        '[{"name":"no-vibrate","target":"jue.vibrate","message":"iOS 需 jue ≥ 2.25.0","conditions":[{"kind":"min_version","platform":"ios","minVersion":"2.25.0"}],"level":"error","onResolveFail":"warn","evidence":"jue.vibrate() [硬校验] iOS 需 2.25.0 以上版本"}]',
+        '[{"target":"jue.vibrate","message":"iOS 需 jue ≥ 2.25.0","conditions":[{"kind":"min_version","platform":"ios","minVersion":"2.25.0"}],"level":"error","onResolveFail":"warn","evidence":"jue.vibrate() [硬校验] iOS 需 2.25.0 以上版本"}]',
         '',
         '示例 2（3 段路径 + 多端 min_version）：',
         '文档片段：「jue.system.getSystemInfo() [硬校验] Android ≥ 2.10.0、iOS ≥ 2.25.0」',
         '输出：',
-        '[{"name":"no-system-getsysteminfo","target":"jue.system.getSystemInfo","message":"Android 需 jue ≥ 2.10.0、iOS 需 jue ≥ 2.25.0","conditions":[{"kind":"min_version","platform":"android","minVersion":"2.10.0"},{"kind":"min_version","platform":"ios","minVersion":"2.25.0"}],"level":"error","onResolveFail":"warn","evidence":"jue.system.getSystemInfo() [硬校验] Android ≥ 2.10.0、iOS ≥ 2.25.0"}]',
+        '[{"target":"jue.system.getSystemInfo","message":"Android 需 jue ≥ 2.10.0、iOS 需 jue ≥ 2.25.0","conditions":[{"kind":"min_version","platform":"android","minVersion":"2.10.0"},{"kind":"min_version","platform":"ios","minVersion":"2.25.0"}],"level":"error","onResolveFail":"warn","evidence":"jue.system.getSystemInfo() [硬校验] Android ≥ 2.10.0、iOS ≥ 2.25.0"}]',
         '',
         '示例 3（无法静态检测 → 跳过，不提取）：',
         '文档片段：「jue.xxx(path) 当 path 为动态拼接时需校验 [跳过]」',
@@ -98,10 +103,25 @@ export function healMissedPrompt(missedApis: string[], doc: string, sdkName: str
         `遗漏的 API（共 ${missedApis.length} 条）：`,
         ...missedApis.map((api) => `- ${api}`),
         '',
-        '提取规则与 Constraint 结构与首次提取完全一致：',
-        `- target 必须以 ${sdkName} 开头，2 或 3 段路径`,
-        '- selector 不需要输出（由引擎自动推导）',
-        '- conditions / level / onResolveFail 按文档标注填写',
+        '提取规则与 Constraint 结构：',
+        `- target 必须以 ${sdkName} 开头，2 或 3 段路径；name 与 selector 都不需要输出（由引擎从 target 推导）`,
+        '- level / onResolveFail 按文档标注填写：`[硬校验]`→error+warn，`[提示]`→warn+warn，`[跳过]`→不提取',
+        '',
+        '每条约束必须输出以下字段（缺一不可，缺 message 会导致整批 schema 校验失败作废）：',
+        '- "target": API 完整挂载路径',
+        '- "message": 违规时报告给开发者的提示语（一句话，含版本/平台要求），**必填**',
+        '- "conditions": 见下方规则',
+        '- "level" / "onResolveFail": 按上方标注映射',
+        '- "evidence": 逐字摘录文档中支撑该约束的原句，禁止改写拼接',
+        '',
+        'conditions 必须严格使用下面两种形态之一（其它写法都会导致整批校验失败）：',
+        '- 某端完全不支持 → { "kind": "unsupported", "platform": "ios" }',
+        '- 某端低于某版本才可用 → { "kind": "min_version", "platform": "ios", "minVersion": "2.25.0" }',
+        `platform 只能取 ${PLATFORM_VALUES.join(' / ')}，不存在 "all"；minVersion 只写版本号本身（如 2.25.0），不要写 ">=2.25.0"。`,
+        '文档说「所有端/全平台 jue ≥ X 才支持」→ 逐端展开成 4 条 min_version（h5/android/ios/harmony）；',
+        '只有「所有端均不支持、无版本条件」才是 "conditions": []（空数组 = 全端无条件禁用）。',
+        '某端「部分机型不支持 / 需能力探测后降级」→ 属提示类：level 用 "warn"、conditions 用 []，',
+        '不要写成 unsupported 全端硬门槛（那会把该端所有调用都拦下）。',
         '',
         '文档内容：',
         doc,
@@ -154,7 +174,8 @@ export function healBehaviorPrompt(
         '- level 设置不当 → 检查文档标注是 [硬校验] 还是 [提示]',
         '- onResolveFail 设置不当 → 检查无守卫场景应降级为 warn 还是 skip',
         '',
-        '请输出修正后的完整 JSON 约束数组（只包含需要修正的约束，每条含 evidence），不要输出解释。',
+        '请输出修正后的完整 JSON 约束数组（只包含需要修正的约束），不要输出解释。',
+        '每条必须含字段：target / message（违规提示语，必填，缺了整批作废）/ conditions / level / onResolveFail / evidence；name 与 selector 不要输出。',
       ].join('\n'),
     },
     { role: 'user', content: `文档内容（修正必须忠实于它）：\n${doc}` },
@@ -181,14 +202,22 @@ export interface OracleScenarioView {
  * 关键：prompt 中不出现任何提取出的约束数据（conditions / level / 期望），
  * 从根上消除「看着数据评审数据」的锚定偏差——它的判定与引擎结果同源度为零，
  * 差分不一致才意味着「数据自洽但与文档不符」。
+ *
+ * 两道加固（不依赖换模型）：
+ * 1. `doc` 由调用方收窄成「该 API 条目 + 全局约定」，切断与提取链共享的全文语境；
+ * 2. 强制「先逐字引用原句、再判定」——引不出就是 unclear，引用由调用方逐字校验。
  */
 export function oracleJudgePrompt(batch: OracleScenarioView[], doc: string): Message[] {
   return [
     {
       role: 'system',
       content: [
-        '你是严格的跨端 SDK 评审员。我会给你团队文档原文和若干段真实业务代码，每段代码标注了使用的 SDK 版本与运行端（H5 / Android / iOS / 鸿蒙）。',
-        '请只依据文档原文，独立判断每段代码调用该 API 在该版本、该端下是否会出问题。你看不到任何自动生成的规则，禁止猜测规则意图，只回答文档怎么说。',
+        '你是严格的跨端 SDK 评审员。我会给你团队文档节选和若干段真实业务代码，每段代码标注了使用的 SDK 版本与运行端（H5 / Android / iOS / 鸿蒙）。',
+        '请只依据我给的文档节选，独立判断每段代码调用该 API 在该版本、该端下是否会出问题。你看不到任何自动生成的规则，禁止猜测规则意图，只回答文档怎么说。',
+        '',
+        '判定方法（必须严格按此两步，不允许先给结论再补依据）：',
+        '第一步：在文档节选中找出与该 API、该端、该版本相关的原句，逐字摘录到 cite 字段。不得改写、拼接、概括、补全。',
+        '第二步：只依据这句引用做判定。引不出原句时，说明文档没有提供依据，verdict 必须是 "unclear"。',
         '',
         '判定四态：',
         '- "error"：文档明确该端不支持该 API，或该端要求的最低 SDK 版本高于代码所用版本 → 静态检查必须报错拦截。',
@@ -200,7 +229,7 @@ export function oracleJudgePrompt(batch: OracleScenarioView[], doc: string): Mes
         '每段代码都有平台守卫（如 if (isIOS)），表示该调用只会在标注的端上执行。',
         '',
         '输出 JSON 数组，每个输入场景对应一个判定：',
-        '[{ "id": "场景 id", "verdict": "error|warn|ok|unclear", "reason": "一句话依据，引用文档原文关键句" }]',
+        '[{ "id": "场景 id", "verdict": "error|warn|ok|unclear", "cite": "文档原句逐字摘录", "reason": "一句话说明依据" }]',
         '',
         '必须覆盖输入的每个场景（id 一一对应），不要遗漏、不要新增。',
       ].join('\n'),
@@ -214,7 +243,7 @@ export function oracleJudgePrompt(batch: OracleScenarioView[], doc: string): Mes
             `### ${s.id}\n版本：${s.version}　运行端：${s.platform}\n代码：\n${s.code.trimEnd()}`,
         ),
         '',
-        `文档原文：\n${doc}`,
+        `文档节选：\n${doc}`,
       ].join('\n\n'),
     },
   ];
@@ -240,13 +269,14 @@ export function judgeSemanticsPrompt(
     {
       role: 'system',
       content: [
-        '你是严格的跨端约束评审员。下面给出从文档自动提取的约束数据行，请逐条对照文档原文，判定约束是否忠实于文档。',
+        '你是严格的跨端约束评审员。下面给出从文档自动提取的约束数据行，请逐条对照文档节选，判定约束是否忠实于文档。',
         '',
         `sdkName：${sdkName}`,
         '',
         '逐条检查四个方面：',
         '1. conditions 忠实性：每个 { kind, platform, minVersion } 都必须有文档原文支撑——platform 不是文档说的端、minVersion 数字与文档不符，都判 ok=false。',
-        '2. level 一致性：文档标注 [硬校验] 应为 "error"，[提示] 应为 "warn"，标错判 ok=false。',
+        '2. level 一致性：文档标注 [硬校验] 应为 "error"，[提示] 应为 "warn"。',
+        '   但若正文语义与标题标签矛盾（如标题写 [硬校验]，正文却写“部分机型不支持 / 需能力探测后降级”），以正文语义为准，该提示类场景按 warn 判通过。',
         '3. evidence 真实性：evidence 必须能在文档中逐字找到；找不到（改写/拼接/编造）判 ok=false。',
         '4. target 一致性：target 必须与文档中的 API 路径完全一致。',
         '',
@@ -260,7 +290,7 @@ export function judgeSemanticsPrompt(
     },
     {
       role: 'user',
-      content: `待评审约束（共 ${batch.length} 条）：\n${JSON.stringify(batch, null, 2)}\n\n文档内容：\n${doc}`,
+      content: `待评审约束（共 ${batch.length} 条）：\n${JSON.stringify(batch, null, 2)}\n\n文档节选（只含本批约束涉及的条目与全局约定）：\n${doc}`,
     },
   ];
 }
@@ -288,6 +318,51 @@ export function healSemanticsPrompt(
         '- 若评审意见指出的问题实际不存在（评审误判），原样重新输出该约束即可。',
         '',
         '只输出修正后的完整 JSON 约束数组（只包含被点名修正的约束），不要输出解释。',
+        '每条必须含字段：target / message（违规提示语，必填，缺了整批作废）/ conditions / level / onResolveFail / evidence；name 与 selector 不要输出。',
+      ].join('\n'),
+    },
+    { role: 'user', content: `文档内容：\n${doc}` },
+  ];
+}
+
+// ---------- heal_versions（自纠错：修正 minVersion 不在版本清单的约束） ----------
+
+/**
+ * 修正「minVersion 不在版本清单」的约束。
+ *
+ * 这类缺陷有两种成因，必须在 prompt 里讲清，否则模型会盲目改数据：
+ *   (a) 版本号抄错 —— 文档写 2.12.0，抄成 2.6.1（此时应改成文档里的正确值）；
+ *   (b) 文档确实引入了清单外的新版本（此时数据可能是对的，需人工补 engine-config 的 order）。
+ * 因此这里把「合法版本清单」直接给模型，并要求它只在文档原文支持另一个清单内版本时才改。
+ */
+export function healVersionsPrompt(
+  problems: { name: string; target: string; platform: string; minVersion: string }[],
+  order: string[],
+  doc: string,
+  sdkName: string,
+): Message[] {
+  return [
+    {
+      role: 'system',
+      content: [
+        '你是跨端约束提取专家。以下约束的 minVersion 不在项目的合法版本清单中，请对照文档原文处理。',
+        '',
+        `sdkName：${sdkName}`,
+        `合法版本清单（升序，minVersion 必须取自此清单）：${order.join(' < ')}`,
+        '',
+        '出问题的约束：',
+        ...problems.map(
+          (p) => `- name: ${p.name}\n  target: ${p.target}\n  ${p.platform} 端要求 ${p.minVersion}`,
+        ),
+        '',
+        '处理规则（按顺序判断）：',
+        '1. 先回到文档原文核对这一条的最低版本要求；',
+        '2. 若文档写的版本是清单里的另一个值（即之前抄错了）→ 按文档原文改成那个值；',
+        '3. 若文档原文确实写的就是这个清单外的版本 → **原样重新输出该约束**，不要为了迎合清单而篡改版本号，',
+        '   这种情形属于「版本清单需要补充」，由人工处理，不属于数据错误。',
+        '',
+        '只输出处理后的完整 JSON 约束数组（只包含被点名的约束），不要输出解释。',
+        '每条必须含字段：target / message（违规提示语，必填，缺了整批作废）/ conditions / level / onResolveFail / evidence；name 与 selector 不要输出。',
       ].join('\n'),
     },
     { role: 'user', content: `文档内容：\n${doc}` },

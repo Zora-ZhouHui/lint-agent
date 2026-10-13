@@ -20,9 +20,11 @@ import { buildUnsupportedApiConfig } from '${prefix}/unsupported-api.js';
 import { loadConstraints, loadEngineConfig } from '${prefix}/data-file.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const constraints = loadConstraints(path.join(here, 'constraints.json'));
 const engineConfigPath = path.join(here, 'engine-config.json');
 const engineConfig = fs.existsSync(engineConfigPath) ? loadEngineConfig(engineConfigPath) : null;
+// 必须用 engine-config 的 sdkName 加载约束：selector 由 target + sdkName 机械推导，
+// 传错名字时 loadConstraints 会直接抛错，而不是让规则静默永不命中。
+const constraints = loadConstraints(path.join(here, 'constraints.json'), engineConfig?.sdkName);
 
 export default [buildUnsupportedApiConfig(constraints, engineConfig)];
 `;

@@ -10,16 +10,23 @@ import type {
   Condition,
   EngineConfig,
   HealRound,
+  Message,
   SelfHealResult,
 } from '../types/index.js';
 import { constraintArraySchema } from '../types/index.js';
 import { extractConstraints } from './extract.js';
 import { Tracer } from './trace.js';
 import { computeCoverage } from '../engine/coverage.js';
-import { synthesizeScenarios, type ScenarioExpect } from '../engine/behavior.js';
+import { severityOf, synthesizeScenarios, unverifiedMinVersions } from '../engine/behavior.js';
 import { buildUnsupportedApiConfig } from '../engine/unsupported-api.js';
-import { targetToSelector } from '../engine/selector.js';
-import { healMissedPrompt, healBehaviorPrompt, healSemanticsPrompt } from '../llm/prompts.js';
+import { nameFromTarget, targetToSelector } from '../engine/selector.js';
+import { callWithItemFallback } from './heal-batch.js';
+import {
+  healMissedPrompt,
+  healBehaviorPrompt,
+  healSemanticsPrompt,
+  healVersionsPrompt,
+} from '../llm/prompts.js';
 import { verifySemantics } from './judge.js';
 import { logger } from '../utils/logger.js';
 
@@ -34,15 +41,103 @@ export interface SelfHealOptions {
 }
 
 /** LLM 输出的原始约束（selector 可选，由 Zod schema 决定）。 */
-type RawConstraint = Omit<Constraint, 'selector'> & { selector?: string };
+type RawConstraint = Omit<Constraint, 'selector' | 'name'> & { selector?: string; name?: string };
 
 const linter = new Linter({ configType: 'flat' });
 
-/** 把 Linter 消息归约为 error / warn / ok 三态。 */
-function severityOf(msgs: Linter.LintMessage[]): ScenarioExpect {
-  if (msgs.some((m) => m.severity === 2)) return 'error';
-  if (msgs.some((m) => m.severity === 1)) return 'warn';
-  return 'ok';
+/** 批次级降级的可观测结果，用于落盘与告警。 */
+interface HealFallbackReport {
+  /** 整批是否成功（未降级） */
+  batchSucceeded: boolean;
+  /** 逐条重试实际发生的调用次数 */
+  fallbackCalls: number;
+  /** 是否因探测失败（系统性故障）而放弃降级 */
+  abortedOnProbe: boolean;
+  /** 因超过上限而未逐条重试的条数 */
+  skippedByLimit: number;
+}
+
+/**
+ * 带「逐条降级」的约束类 heal 调用。
+ *
+ * 先整批调用（成功则零额外成本）；整批失败（如某条 `name` 不合 kebab-case 导致
+ * Zod 校验整体失败）时降级为逐条重试，并**保留已通过校验的部分**——一条坏数据
+ * 不再让整批修正作废（见 agent/heal-batch.ts 的说明与实测记录）。
+ *
+ * 返回 null 表示确实没救回来（探测也失败，或最终一条都没解析成功）。
+ */
+async function healConstraintsWithFallback(
+  items: unknown[],
+  label: string,
+  buildPrompt: (batch: unknown[]) => Message[],
+  llm: LLMClient,
+  sdkName: string,
+): Promise<{ constraints: Constraint[]; report: HealFallbackReport; recovered: boolean }> {
+  // `items` 是各 heal prompt 的入参（字符串 / 失败明细对象，形态各异），
+  // 这里只做透传，不关心具体结构。
+  const batchCall = async (batch: unknown[]): Promise<Constraint[]> => {
+    const raw = await llm.chatJSON(buildPrompt(batch), constraintArraySchema, {
+      label,
+      temperature: 0.1,
+      maxTokens: 8192,
+      structuredOutput: true,
+    });
+    return toConstraints(raw as RawConstraint[], sdkName);
+  };
+
+  const outcome = await callWithItemFallback<unknown, Constraint>(items, batchCall);
+  const report: HealFallbackReport = {
+    batchSucceeded: outcome.batchSucceeded,
+    fallbackCalls: outcome.fallbackCalls,
+    abortedOnProbe: outcome.abortedOnProbe,
+    skippedByLimit: outcome.skippedByLimit,
+  };
+  // 注意：即使一条都没救回来（探测即失败）也必须把 report 交出去——
+  // 降级确实发生了，成本与原因不能被「没救回来」这件事吞掉。
+  return { constraints: outcome.items, report, recovered: outcome.items.length > 0 };
+}
+
+/**
+ * 把修正结果合并回约束列表（按 target 对齐），返回新的约束数组与被接受的**真实变更数**。
+ * 语义与原先各 heal 分支内联的逻辑一致：只有内容真的变了才计入 healedCount，
+ * 杜绝「重试次数」被当成「修正数」的虚假指标。
+ */
+function mergeHealedConstraints(
+  constraints: Constraint[],
+  healed: Constraint[],
+  restrictToTargets?: Set<string>,
+): { constraints: Constraint[]; changed: number } {
+  const byTarget = new Map(healed.map((c) => [c.target, c]));
+  let changed = 0;
+  const next = constraints.map((c) => {
+    if (restrictToTargets && !restrictToTargets.has(c.target)) return c;
+    const replacement = byTarget.get(c.target);
+    if (!replacement || sameConstraint(c, replacement)) return c;
+    changed++;
+    return replacement;
+  });
+  return { constraints: next, changed };
+}
+
+/**
+ * 把降级情况落盘告警。
+ *
+ * 为什么必须上报而不是静默降级：逐条重试会成倍放大 LLM 调用次数，
+ * 如果不显式说明「整批失败了、改走了逐条、花了多少次、有没有被上限截断」，
+ * 成本上升会被完全隐藏，也无从判断是「个别数据坏」还是「系统性故障」。
+ */
+function reportFallback(
+  strategy: string,
+  report: HealFallbackReport,
+  llmFailures: { strategy: string; error: string }[],
+): void {
+  if (report.batchSucceeded) return;
+  const parts = [`整批失败→逐条重试 ${report.fallbackCalls} 次`];
+  if (report.abortedOnProbe) parts.push('探测即失败，判定为系统性故障，已放弃逐条重试');
+  if (report.skippedByLimit > 0) parts.push(`${report.skippedByLimit} 条超出逐条上限未重试`);
+  const note = `${strategy}：${parts.join('；')}`;
+  llmFailures.push({ strategy: `${strategy}_batch_fallback`, error: note });
+  logger.warn(note);
 }
 
 /**
@@ -102,7 +197,9 @@ function verifyAllBehaviors(
 /** 从 LLM 原始输出构造 Constraint[]（selector 由 target 机械推导，evidence 透传）。 */
 function toConstraints(raw: RawConstraint[], sdkName: string): Constraint[] {
   return raw.map((c) => ({
-    name: c.name,
+    // name 与 selector 一样由 target 机械推导：LLM 曾把 name 填成 API 路径，
+    // 违反 kebab-case 让整批修正作废（实测 9 条漏提三轮修不回）。
+    name: nameFromTarget(c.target, sdkName),
     target: c.target,
     selector: targetToSelector(c.target, sdkName),
     message: c.message,
@@ -155,18 +252,37 @@ export async function extractWithSelfHeal(
 
     // ---- 感知：覆盖率 + 行为 + 语义三道校验 ----
     const coverage = computeCoverage(doc, constraints, sdkName);
+    const versionProblems = unverifiedMinVersions(constraints, engineConfig);
     const behaviorFailures = verifyAllBehaviors(constraints, engineConfig);
-    const semanticFailures = await verifySemantics(doc, constraints, llm, sdkName);
+    
+    const semanticCheck = await verifySemantics(doc, constraints, llm, sdkName);
+    const semanticFailures = semanticCheck.failures;
+
+    // 语义评审批次失败 → 本轮「无语义问题」不可信：必须计入失败清单，
+    // 否则一轮批调用全挂时会静默判定为「全部通过」。
+    const semanticBatchFailures: { strategy: string; error: string }[] =
+      constraints.length > 0 && (semanticCheck.failedBatches > 0 || semanticCheck.okBatches === 0)
+        ? [
+            {
+              strategy: 'judge_semantics',
+              error: `${semanticCheck.failedBatches} 批评审调用失败（成功 ${semanticCheck.okBatches} 批），本轮语义结论不完整`,
+            },
+          ]
+        : [];
 
     const allPassed =
       coverage.missed.length === 0 &&
       coverage.hallucinated.length === 0 &&
       behaviorFailures.length === 0 &&
-      semanticFailures.length === 0;
+      semanticFailures.length === 0 &&
+      semanticBatchFailures.length === 0 &&
+      versionProblems.length === 0;
 
     const observation = allPassed
       ? `第 ${round} 轮：全部通过（${constraints.length} 条约束）`
-      : `第 ${round} 轮：漏提 ${coverage.missed.length}、幻觉 ${coverage.hallucinated.length}、自检失败 ${behaviorFailures.length}、语义失败 ${semanticFailures.length}`;
+      : `第 ${round} 轮：漏提 ${coverage.missed.length}、幻觉 ${coverage.hallucinated.length}、` +
+        `自检失败 ${behaviorFailures.length}、语义失败 ${semanticFailures.length}、` +
+        `版本清单缺项 ${versionProblems.length}`;
 
     const healRound: HealRound = {
       round,
@@ -176,6 +292,7 @@ export async function extractWithSelfHeal(
       coverageHallucinated: coverage.hallucinated,
       behaviorFailures: behaviorFailures.map(({ name, reason }) => ({ name, reason })),
       semanticFailures,
+      unverifiedMinVersions: versionProblems,
       healedCount: 0,
       durationMs: 0,
       tokensUsed: 0,
@@ -217,7 +334,7 @@ export async function extractWithSelfHeal(
 
     // ---- 决策 + 行动：自纠错（四类固定策略，决策空间可枚举） ----
     let healedCount = 0;
-    const llmFailures: { strategy: string; error: string }[] = [];
+    const llmFailures: { strategy: string; error: string }[] = [...semanticBatchFailures];
 
     // 1. 移除幻觉约束（无需 LLM）
     if (coverage.hallucinated.length > 0) {
@@ -227,72 +344,146 @@ export async function extractWithSelfHeal(
       healedCount += before - constraints.length;
     }
 
-    // 2. 补提取漏掉的 API（LLM 调用）
+    // 2. 补提取漏掉的 API（LLM 调用，整批失败自动降级为逐条重试）
     if (coverage.missed.length > 0) {
-      try {
-        const raw = await llm.chatJSON(
-          healMissedPrompt(coverage.missed, doc, sdkName),
-          constraintArraySchema,
-          { label: 'heal_missed', temperature: 0.1, maxTokens: 8192, structuredOutput: true },
-        );
-        const healed = toConstraints(raw as RawConstraint[], sdkName);
-        const existing = new Set(constraints.map((c) => c.target));
-        for (const c of healed) {
-          if (!existing.has(c.target)) {
-            constraints.push(c);
-            healedCount++;
-          }
-        }
-      } catch (err) {
+      const res = await healConstraintsWithFallback(
+        coverage.missed,
+        'heal_missed',
+        (batch) => healMissedPrompt(batch as string[], doc, sdkName),
+        llm,
+        sdkName,
+      ).catch((err: unknown) => {
         const msg = errMessage(err);
         llmFailures.push({ strategy: 'heal_missed', error: msg });
         logger.warn(`heal_missed LLM 调用失败（不中断循环）：${msg.slice(0, 120)}`);
+        return {
+          constraints: [],
+          report: {
+            batchSucceeded: false,
+            fallbackCalls: 0,
+            abortedOnProbe: false,
+            skippedByLimit: 0,
+          },
+          recovered: false,
+        };
+      });
+      if (!res.report.batchSucceeded) reportFallback('heal_missed', res.report, llmFailures);
+      if (res.recovered) {
+        const existing = new Set(constraints.map((c) => c.target));
+        for (const c of res.constraints) {
+          if (!existing.has(c.target)) {
+            constraints.push(c);
+            existing.add(c.target);
+            healedCount++;
+          }
+        }
       }
     }
 
     // 3. 修正语义评审失败的约束（LLM 调用，带评审意见 + 文档原文）
     if (semanticFailures.length > 0) {
-      try {
-        const raw = await llm.chatJSON(
-          healSemanticsPrompt(semanticFailures, doc, sdkName),
-          constraintArraySchema,
-          { label: 'heal_semantics', temperature: 0.1, maxTokens: 8192, structuredOutput: true },
-        );
-        const fixed = toConstraints(raw as RawConstraint[], sdkName);
-        const fixedMap = new Map(fixed.map((c) => [c.target, c]));
-        constraints = constraints.map((c) => {
-          const replacement = fixedMap.get(c.target);
-          if (!replacement || sameConstraint(c, replacement)) return c;
-          healedCount++;
-          return replacement;
-        });
-      } catch (err) {
+      const res = await healConstraintsWithFallback(
+        semanticFailures,
+        'heal_semantics',
+        (batch) =>
+          healSemanticsPrompt(
+            batch as { name: string; target: string; issue: string }[],
+            doc,
+            sdkName,
+          ),
+        llm,
+        sdkName,
+      ).catch((err: unknown) => {
         const msg = errMessage(err);
         llmFailures.push({ strategy: 'heal_semantics', error: msg });
         logger.warn(`heal_semantics LLM 调用失败（不中断循环）：${msg.slice(0, 120)}`);
+        return {
+          constraints: [],
+          report: {
+            batchSucceeded: false,
+            fallbackCalls: 0,
+            abortedOnProbe: false,
+            skippedByLimit: 0,
+          },
+          recovered: false,
+        };
+      });
+      if (!res.report.batchSucceeded) reportFallback('heal_semantics', res.report, llmFailures);
+      if (res.recovered) {
+        const merged = mergeHealedConstraints(constraints, res.constraints);
+        constraints = merged.constraints;
+        healedCount += merged.changed;
       }
     }
 
     // 4. 修正引擎自检失败的约束（LLM 调用，带不匹配场景代码 + 期望/实际差异 + 文档原文）
     if (behaviorFailures.length > 0) {
-      try {
-        const raw = await llm.chatJSON(
-          healBehaviorPrompt(behaviorFailures, doc, sdkName),
-          constraintArraySchema,
-          { label: 'heal_behavior', temperature: 0.1, maxTokens: 8192, structuredOutput: true },
-        );
-        const fixed = toConstraints(raw as RawConstraint[], sdkName);
-        const fixedMap = new Map(fixed.map((c) => [c.target, c]));
-        constraints = constraints.map((c) => {
-          const replacement = fixedMap.get(c.target);
-          if (!replacement || sameConstraint(c, replacement)) return c;
-          healedCount++;
-          return replacement;
-        });
-      } catch (err) {
+      const res = await healConstraintsWithFallback(
+        behaviorFailures,
+        'heal_behavior',
+        (batch) => healBehaviorPrompt(batch as BehaviorFailureDetail[], doc, sdkName),
+        llm,
+        sdkName,
+      ).catch((err: unknown) => {
         const msg = errMessage(err);
         llmFailures.push({ strategy: 'heal_behavior', error: msg });
         logger.warn(`heal_behavior LLM 调用失败（不中断循环）：${msg.slice(0, 120)}`);
+        return {
+          constraints: [],
+          report: {
+            batchSucceeded: false,
+            fallbackCalls: 0,
+            abortedOnProbe: false,
+            skippedByLimit: 0,
+          },
+          recovered: false,
+        };
+      });
+      if (!res.report.batchSucceeded) reportFallback('heal_behavior', res.report, llmFailures);
+      if (res.recovered) {
+        const merged = mergeHealedConstraints(constraints, res.constraints);
+        constraints = merged.constraints;
+        healedCount += merged.changed;
+      }
+    }
+
+    // 5. 修正 minVersion 不在版本清单的约束（LLM 调用，带合法版本清单 + 文档原文）
+    //    注意：这一步**允许模型原样返回**——若文档原文确实写了这个清单外版本，
+    //    那属于「版本清单需要补充」，不该为了迎合清单而篡改数据（prompt 已明确规则）。
+    if (versionProblems.length > 0) {
+      const healedTargets = new Set(versionProblems.map((p) => p.target));
+      const res = await healConstraintsWithFallback(
+        versionProblems,
+        'heal_versions',
+        (batch) =>
+          healVersionsPrompt(
+            batch as { name: string; target: string; platform: string; minVersion: string }[],
+            engineConfig.order,
+            doc,
+            sdkName,
+          ),
+        llm,
+        sdkName,
+      ).catch((err: unknown) => {
+        const msg = errMessage(err);
+        llmFailures.push({ strategy: 'heal_versions', error: msg });
+        logger.warn(`heal_versions LLM 调用失败（不中断循环）：${msg.slice(0, 120)}`);
+        return {
+          constraints: [],
+          report: {
+            batchSucceeded: false,
+            fallbackCalls: 0,
+            abortedOnProbe: false,
+            skippedByLimit: 0,
+          },
+          recovered: false,
+        };
+      });
+      if (!res.report.batchSucceeded) reportFallback('heal_versions', res.report, llmFailures);
+      if (res.recovered) {
+        const merged = mergeHealedConstraints(constraints, res.constraints, healedTargets);
+        constraints = merged.constraints;
+        healedCount += merged.changed;
       }
     }
 
@@ -326,7 +517,8 @@ export async function extractWithSelfHeal(
   // 达到 maxRounds 后仍未通过：返回剩余问题
   const finalCoverage = computeCoverage(doc, constraints, sdkName);
   const finalBehaviorFailures = verifyAllBehaviors(constraints, engineConfig);
-  const finalSemanticFailures = await verifySemantics(doc, constraints, llm, sdkName);
+  const finalSemanticCheck = await verifySemantics(doc, constraints, llm, sdkName);
+  const finalSemanticFailures = finalSemanticCheck.failures;
 
   return {
     constraints,
@@ -362,6 +554,7 @@ export function printConvergenceTable(rounds: HealRound[], passed: boolean): voi
     '幻觉',
     '自检失败',
     '语义失败',
+    '版本缺项',
     '修正数',
     'LLM失败',
     'Token',
@@ -376,6 +569,7 @@ export function printConvergenceTable(rounds: HealRound[], passed: boolean): voi
       String(r.coverageHallucinated.length).padStart(6),
       String(r.behaviorFailures.length).padStart(6),
       String(r.semanticFailures.length).padStart(6),
+      String(r.unverifiedMinVersions.length).padStart(6),
       String(r.healedCount).padStart(6),
       String(r.llmFailures.length).padStart(6),
       String(r.tokensUsed).padStart(6),
@@ -383,9 +577,9 @@ export function printConvergenceTable(rounds: HealRound[], passed: boolean): voi
     ];
     console.log(row.join('  '));
   }
-  console.log('─'.repeat(70));
+  console.log('─'.repeat(78));
   console.log(
-    `合计${' '.repeat(44)}${String(totalTokens).padStart(6)}   ${(totalMs / 1000).toFixed(1)}s`,
+    `合计${' '.repeat(52)}${String(totalTokens).padStart(6)}   ${(totalMs / 1000).toFixed(1)}s`,
   );
   console.log(`收敛: ${passed ? '全部通过' : '仍有残留'}（${rounds.length} 轮）\n`);
 }

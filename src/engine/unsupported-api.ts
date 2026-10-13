@@ -1,11 +1,18 @@
 // 单引擎：只写一个 ESLint 规则（pg/unsupported-api），运行时读一份约束数据 + 引擎配置。
-// selector 匹配 → 调用点级解析（版本 = import 路径、平台 = 运行时守卫）→ 三级校验（error/warn/skip）。
+// 形状 selector 预筛 → 调用点级解析（SDK 归属 = 作用域绑定、版本 = import 路径、平台 = 运行时守卫）
+// → 三级校验（error/warn/skip）。
 // ESLint 9 的 `context.report` 不再支持按条指定 severity，故拆成两条同名规则（error / warn）
 // 分别报告对应严重度的判定结果，二者共享同一套约束与解析逻辑。
 import type * as ESTree from 'estree';
 import type { Linter, Scope } from 'eslint';
 import type { Constraint, EngineConfig } from '../types/index.js';
-import { decideSeverity, findRootIdentifier, resolvePlatforms, resolveVersion } from './resolve.js';
+import {
+  decideSeverity,
+  resolvePlatforms,
+  resolveSdkCall,
+  type PlatformResolution,
+} from './resolve.js';
+import { targetToShapeSelectors } from './selector.js';
 
 export const RULE_NAME = 'unsupported-api';
 export const WARN_RULE_NAME = 'unsupported-api-warn';
@@ -29,51 +36,37 @@ export interface UnsupportedApiOptions {
   engineConfig?: EngineConfig | null;
 }
 
-/** 单条约束在命中节点上的最终判定：report error / report warn / 不报。 */
-function evaluateConstraint(
-  constraint: Constraint,
-  node: ESTree.Node,
-  context: UnsupportedApiContext,
-  config: EngineConfig | null,
-  order: string[],
-): 'error' | 'warn' | null {
-  // 无引擎配置 → 版本/平台均视为解析失败（L1 空 conditions 仍无条件报 error）
-  if (!config) {
-    return decideSeverity(
-      constraint,
-      { status: 'fail', reason: 'no-import' },
-      { status: 'fail', reason: 'no-guard' },
-      order,
-    );
-  }
-
-  const root = findRootIdentifier(node);
-  // selector 未命中 jue 根标识（防御：跳过，避免误报）
-  if (!root || root.name !== config.sdkName) {
-    return null;
-  }
-
-  const version = resolveVersion(root, context.sourceCode.getScope(root));
-  const platforms = resolvePlatforms(node, context.sourceCode.getAncestors(node), config.guards);
-  return decideSeverity(constraint, version, platforms, order);
-}
-
 /**
- * 由约束数据行构造规则：按 selector 分组（同一 selector 的多条约束合并进一个 visitor），
+ * 由约束数据行构造规则。
+ *
+ * 匹配分两步（见 selector.ts targetToShapeSelectors 的说明）：
+ *   1. **形状 selector 预筛**：只按调用链层级 + 模块名 / 方法名注册 visitor，不限定根标识名，
+ *      因此别名导入、解构导入也能进入判定；形状 selector 由 target 机械推导，去重后共享。
+ *   2. **绑定判定 + 按 SDK 相对路径分派**：resolveSdkCall 沿作用域链确认「这是不是 SDK 调用」
+ *      并算出相对路径，再按路径 O(1) 取约束——因此一条 shape selector 被多条约束复用时不会误报。
+ *
  * `reportSeverity` 决定这条规则只报告 error 还是 warn 判定结果（配合配置里的规则 severity）。
  */
 export function createUnsupportedApiRule(
   options: UnsupportedApiOptions,
   reportSeverity: 'error' | 'warn',
 ): UnsupportedApiRuleModule {
-  const bySelector = new Map<string, Constraint[]>();
-  for (const c of options.constraints) {
-    const list = bySelector.get(c.selector) ?? [];
-    list.push(c);
-    bySelector.set(c.selector, list);
-  }
   const config = options.engineConfig ?? null;
   const order = config?.order ?? [];
+  // 无引擎配置时退回约定的 SDK 名（与 loadConstraints / defaultEngineConfig 一致）：
+  // 绑定判定必须知道根标识叫什么，缺它规则就只能整体停摆。
+  const sdkName = config?.sdkName ?? 'jue';
+
+  const byPath = new Map<string, Constraint[]>();
+  const shapeSelectors = new Set<string>();
+  for (const c of options.constraints) {
+    // SDK 相对路径 = target 去掉根标识（targetToSelector 保证了首段就是 sdkName）
+    const relativePath = c.target.split('.').slice(1).join('.');
+    const list = byPath.get(relativePath) ?? [];
+    list.push(c);
+    byPath.set(relativePath, list);
+    for (const selector of targetToShapeSelectors(c.target)) shapeSelectors.add(selector);
+  }
 
   return {
     meta: {
@@ -83,15 +76,26 @@ export function createUnsupportedApiRule(
     },
     create(context) {
       const visitors: Record<string, (node: ESTree.Node) => void> = {};
-      for (const [selector, list] of bySelector) {
-        visitors[selector] = (node) => {
-          for (const c of list) {
-            if (evaluateConstraint(c, node, context, config, order) === reportSeverity) {
-              context.report({ node, message: c.message });
-            }
+
+      const visit = (node: ESTree.Node) => {
+        const resolution = resolveSdkCall(node, context.sourceCode.getScope(node), sdkName);
+        if (!resolution) return; // 非 SDK 调用（或形态不支持）→ 不报，防误报
+        const matched = byPath.get(resolution.path);
+        if (!matched) return;
+
+        // 无引擎配置 → 平台视为解析失败（L1 空 conditions 仍无条件报 error）
+        const platforms: PlatformResolution = config
+          ? resolvePlatforms(node, context.sourceCode.getAncestors(node), config.guards)
+          : { status: 'fail', reason: 'no-guard' };
+
+        for (const c of matched) {
+          if (decideSeverity(c, resolution.version, platforms, order) === reportSeverity) {
+            context.report({ node, message: c.message });
           }
-        };
-      }
+        }
+      };
+
+      for (const selector of shapeSelectors) visitors[selector] = visit;
       return visitors;
     },
   };

@@ -61,6 +61,21 @@ export interface OracleFailure {
   oracleReason: string;
 }
 
+/**
+ * 校验器的执行结果：除了失败项，还必须显式交出「跑了多少批 / 挂了多少批」。
+ *
+ * 为什么不能只返回 failures：批次调用失败被吞掉时，failures 为空与「真的没有问题」
+ * 完全无法区分，校验器会静默退化为「什么都没验却报通过」。调用方据此把
+ * failedBatches 计入裁决与退出码。
+ */
+export interface CheckOutcome<T> {
+  failures: T[];
+  /** 成功返回并参与判定的批次数 */
+  okBatches: number;
+  /** 调用 / 解析失败、被跳过的批次数 */
+  failedBatches: number;
+}
+
 /** 行为校验（引擎自检）失败详情：带场景代码与期望/实际差异，供 heal prompt 回喂完整上下文。 */
 export interface BehaviorFailureDetail {
   name: string;
@@ -111,6 +126,14 @@ export interface AgentStep {
 // ---------- 自纠错循环（generate → eval → self-heal） ----------
 
 /** 单轮自纠错的执行记录。 */
+/** 一条约束里「不在版本清单中」的 minVersion 明细（引擎侧同构定义见 engine/behavior.ts）。 */
+export interface UnverifiedMinVersion {
+  name: string;
+  target: string;
+  platform: Platform;
+  minVersion: string;
+}
+
 export interface HealRound {
   round: number;
   observation: string;
@@ -119,6 +142,12 @@ export interface HealRound {
   coverageHallucinated: string[];
   behaviorFailures: { name: string; reason: string }[];
   semanticFailures: SemanticFailure[]; // 语义校验失败（约束与文档原文不符）
+  /**
+   * 该轮 minVersion 不在版本清单 `order` 中的明细。
+   * 这类约束在已知版本空间内未被正向验证（`min-<端>-below` 场景生成不出来），
+   * 且会让引擎自检给出错误归因，因此单独统计并驱动修正。
+   */
+  unverifiedMinVersions: UnverifiedMinVersion[];
   healedCount: number;
   durationMs: number;
   tokensUsed: number;
@@ -201,8 +230,17 @@ export const conditionSchema = z.discriminatedUnion('kind', [
   }),
 ]);
 
-export const constraintSchema = z.object({
-  name: z.string().regex(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/, '约束名必须是 kebab-case'),
+/**
+ * 约束数据的**基础** schema：不含 `name`。
+ *
+ * 为什么把 `name` 排除在 LLM 输出契约之外：它只是 `target` 的人读投影，没有独立信息量，
+ * 却同时是 judge verdict 的对齐键。实测失效：LLM 在补提取时稳定地把 `name` 填成 API 路径
+ * （`"name":"jue.router.navigateTo"`），违反 kebab-case —— 一次运行 9 条漏提三轮全部作废。
+ * 与 `selector` 同一解法：**不由 LLM 产出，由引擎从 target 机械推导**（见 nameFromTarget）。
+ *
+ * 这里刻意用非 strict 的 z.object：模型若仍多输出 `name`，会被直接剥掉而不是触发校验失败。
+ */
+const constraintBaseSchema = z.object({
   target: z.string().min(1),
   // selector 不再由 LLM 产出，由 targetToSelector 机械推导；保留可选以兼容历史数据
   selector: z.string().optional(),
@@ -214,7 +252,16 @@ export const constraintSchema = z.object({
   evidence: z.string().default(''),
 });
 
-export const constraintArraySchema = z.array(constraintSchema);
+/** 含推导字段 `name` 的完整约束 schema（写入 / 展示用）。 */
+export const constraintSchema = constraintBaseSchema.extend({
+  name: z.string().regex(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/, '约束名必须是 kebab-case'),
+});
+
+/**
+ * LLM 输出用的数组 schema：同样是**基础** schema（不含 name）。
+ * 提取与四类修正都走它，name 由 toConstraints / extractPatterns 统一推导后补上。
+ */
+export const constraintArraySchema = z.array(constraintBaseSchema);
 
 /** LLM-as-judge 语义评审的单条判定结果。 */
 export const semanticVerdictSchema = z.object({
@@ -231,10 +278,15 @@ export const semanticVerdictArraySchema = z.array(semanticVerdictSchema);
  * - warn：文档只有废弃/迁移类提醒，应报 warn
  * - ok：文档支持，应放行
  * - unclear：文档未提及该 API 或无法判断该场景（差分跳过，不判失败）
+ *
+ * `cite` 是「引用先行」的产物：oracle 必须先逐字摘录文档原句，再做判定。
+ * 调用方用 `validateCitation` 校验该原句确实存在于它看到的文档片段中——
+ * 引用不存在（幻觉引用）时该判定作废、按 unclear 处理，绝不当成有效信号。
  */
 export const oracleVerdictSchema = z.object({
   id: z.string().min(1),
   verdict: z.enum(['error', 'warn', 'ok', 'unclear']),
+  cite: z.string().default(''),
   reason: z.string().default(''),
 });
 

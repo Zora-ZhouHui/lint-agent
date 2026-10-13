@@ -85,6 +85,35 @@ export function extractJSON(text: string): unknown {
   }
 }
 
+/**
+ * 已知的「信封键」：模型有时把本该是裸数组的结果包一层对象
+ * （如 `{"constraints":[...]}`、`{"data":[...]}`），而契约要求的是裸数组。
+ *
+ * 实测：补提取在同一契约下反复变换形状 —— 裸数组 / `{"constraints":[...]}` /
+ * `{"platform":"all","jue":">=2.0.0"}`，导致整批 Zod 校验失败、漏提三轮补不回来。
+ * 逐次改 prompt 治不了根（形状随调用漂移），因此在客户端边界做一次**有界**容错。
+ */
+const ENVELOPE_KEYS = new Set(['constraints', 'data', 'items', 'result', 'results', 'array']);
+
+/**
+ * 把「单键信封对象」逐层剥开。**只在 schema 校验失败后调用**，因此：
+ * - 正常响应（裸数组 / 正确对象）永远不会走到这里，零行为变化；
+ * - 不会掩盖真实的数据形状错误——剥完之后仍要过同一套 Zod 校验。
+ *
+ * 保守条件：对象**恰好一个键**且键名在已知信封集合内，避免把
+ * `{"kind":"min_version","platform":"ios"}` 这类合法业务对象误当信封。
+ */
+export function unwrapEnvelope(value: unknown, maxDepth = 3): unknown {
+  let current = value;
+  for (let i = 0; i < maxDepth; i++) {
+    if (current === null || typeof current !== 'object' || Array.isArray(current)) return current;
+    const keys = Object.keys(current as Record<string, unknown>);
+    if (keys.length !== 1 || !ENVELOPE_KEYS.has(keys[0])) return current;
+    current = (current as Record<string, unknown>)[keys[0]];
+  }
+  return current;
+}
+
 export class LLMClient {
   private openai?: OpenAI;
   private anthropic?: Anthropic;
@@ -175,7 +204,17 @@ export class LLMClient {
         if (useStructured && parsed !== null && typeof parsed === 'object' && 'data' in parsed) {
           parsed = (parsed as { data: unknown }).data;
         }
-        return schema.parse(parsed);
+        const direct = schema.safeParse(parsed);
+        if (direct.success) return direct.data;
+        // 直接校验失败 → 再试一次「剥信封」，仍失败才走修复循环重试
+        const unwrapped = unwrapEnvelope(parsed);
+        if (unwrapped !== parsed) {
+          const retried = schema.safeParse(unwrapped);
+          if (retried.success) return retried.data;
+        }
+        // 都失败：抛出**直接校验**的错误（而不是解包后的），
+        // 这样回传给模型修复的信息与它的原始输出对应，不会让人误以为是信封问题
+        throw direct.error;
       } catch (err) {
         lastError = err;
         const reason = errMessage(err).slice(0, 500);

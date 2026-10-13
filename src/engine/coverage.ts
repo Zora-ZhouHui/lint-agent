@@ -27,18 +27,31 @@ export function extractApiPaths(doc: string, sdkName = 'jue'): string[] {
   return [...all].filter((p) => plain.has(p));
 }
 
+/** markdown 条目标题行，如 `### 23. jue.network.request [硬校验]`。 */
+const HEADING_RE = /^#{2,4}\s*\d+\.\s/;
+
 /**
  * 从文档中抽取标了 [跳过] 的 API 路径（这些是预期不提取的，不计入漏提）。
- * 逐行扫描，含 [跳过] 标记的行上的 API 路径视为跳过。
+ *
+ * 两条规则，缺一不可：
+ * 1. **只看条目标题行**。[跳过] 的语义是「这个条目不该被提取」，正文 / 图例里的
+ *    `[跳过]` 字样（如格式说明）不代表任何 API。
+ * 2. **同名 API 若在别处是硬校验 / 提示条目，则不算跳过**。文档里同一路径可能同时
+ *    出现在「硬校验」条目和另一个「[跳过]」条目（如 jue.network.request 既有
+ *    全端版本门槛，又有并发上限的语义约束）。若按 API 名整体划入跳过，这条真 API
+ *    就会在覆盖率里双向隐身：漏提不报、编造也不报。
  */
 export function extractSkippedApiPaths(doc: string, sdkName = 'jue'): string[] {
   const re = new RegExp(`\\b${sdkName}\\.[a-zA-Z_$][\\w$]*(?:\\.[a-zA-Z_$][\\w$]*)+`, 'g');
   const skipped = new Set<string>();
+  const asserted = new Set<string>();
   for (const line of doc.split('\n')) {
-    if (!line.includes('[跳过]')) continue;
-    for (const m of line.matchAll(re)) skipped.add(m[0]);
+    if (!HEADING_RE.test(line)) continue;
+    const paths = [...line.matchAll(re)].map((m) => m[0]);
+    const target = line.includes('[跳过]') ? skipped : asserted;
+    for (const p of paths) target.add(p);
   }
-  return [...skipped];
+  return [...skipped].filter((p) => !asserted.has(p));
 }
 
 /** 覆盖率报告：docApiPaths / generatedTargets 为原始集合，missed / hallucinated 为差集。 */
